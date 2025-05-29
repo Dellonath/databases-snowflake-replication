@@ -37,9 +37,7 @@ class DatabaseClient:
         self.__password = password
         self.database = database
         self.port = port
-
-        self.__engine = self.__database_connection()
-        self.connection_status = self.__test_connection()
+        self.__engine = self.__establish_db_connection()
 
     def execute_query(
         self,
@@ -82,9 +80,7 @@ class DatabaseClient:
         try:
             inspector = inspect(subject=self.__engine)
             columns = inspector.get_columns(table_name=table_name)
-            
             return [column['name'] for column in columns]
-        
         except ProgrammingError as e:
             _log.error(e)
         except DatabaseError as e:
@@ -106,16 +102,13 @@ class DatabaseClient:
 
         query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
         config_table_list = set(table_config[0] for table_config in self.execute_query(query=query))
-        
         return config_table_list
     
-    def __database_connection(
+    def __establish_db_connection(
         self
     ) -> None:
 
-        """
-        Create a database connection.
-        """
+        """Create a database connection"""
     
         if self.__db_engine == 'postgresql+psycopg2':
             url = f'{self.__db_engine}://{self.__username}:{self.__password}@{self.__host}/{self.database}'
@@ -123,34 +116,13 @@ class DatabaseClient:
             url = f'{self.__db_engine}://{self.__username}:{self.__password}@{self.__host}:{self.port}/{self.database}'
         
         try:
-            engine = create_engine(url=url, 
-                                   pool_size=10, 
-                                   pool_recycle=1800)
-            _log.info(f"Database connection established: {url}")
-                        
+            engine = create_engine(url=url)
+            _log.info(f"Connection for '{self.database}' database established successfully")       
             return engine
-
         except OperationalError as e:
-            _log.error(f"Failed to connect to the database: {e}")
-            raise e
-
-    def __test_connection(
-        self
-    ) -> bool:
-
-        """
-        Test the database connection.
+            _log.error(e)
+            
+    def __del__(self) -> None:
+        self.__engine.dispose()
+        _log.info(f"Source database '{self.database}' connection closed successfully")
         
-        Returns:
-            bool: True if the connection is successful, False otherwise.
-        """
-
-        try:
-            with self.__engine.connect() as connection:
-                connection.execute(text('SELECT 1'))
-            _log.info(f"Database connection successful: database='{self.database}'")
-
-            return True
-        except OperationalError as e:
-            _log.error(f'Failed to connect to the database due to: {e}')
-            return False
