@@ -106,13 +106,13 @@ class SnowflakeClient:
         
         try:
             connection = snowflake.connector.connect(
+                role=os.getenv('sw_role'),
                 user=os.getenv('sw_user'),
                 password=os.getenv('sw_password'),
                 account=os.getenv('sw_account'),
-                database=os.getenv('sw_database'),
                 warehouse=os.getenv('sw_warehouse'),
-                schema=os.getenv('sw_schema'),
-                role=os.getenv('sw_role')
+                database=os.getenv('sw_database'),
+                schema=os.getenv('sw_schema')
             )
         except Exception as e:
             _log.error(f"Failed to connect to Snowflake: {e}")
