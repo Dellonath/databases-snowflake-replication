@@ -112,8 +112,8 @@ class TaskManagerClient:
         # uploading file to cloud storage
         _log.info(f"Uploading file: table='{database}.{table_name}' path='{file_path}'")
         status = self.__cloud_client.upload_file(file_path=file_path)
-        # if status:
-        #     self.__file_service_client.delete_file(file_path=file_path)
+        if status:
+            self.__file_service_client.delete_file(file_path=file_path)
         
         # uploading remaining files if the flag is set
         if self.upload_remaining_files:

@@ -13,7 +13,8 @@ from logs.logger import _log
 CONFIG_FILES_PATH = 'config'
 DATA_OUTPUT_PATH = 'data'
 MAX_WORKERS = 5
-BUCKET_NAME = 'ct-carasso-poc'
+BUCKET_NAME = os.getenv('aws_s3_bucket')
+STAGE_ROOT_PATH = f's3://{BUCKET_NAME}/{DATA_OUTPUT_PATH}'
 VALID_FILE_FORMATS = ['csv', 'parquet']
 VALID_INGESTION_MODES = ['incremental', 'full_load']
 VALID_ENGINES = ['mysql+pymysql', 'postgresql+psycopg2']
@@ -50,7 +51,7 @@ if __name__ == '__main__':
     _log.info(f'Found {len(configs_paths)} configuration files: {', '. join(configs_paths)}')    
     
     cloud_client = CloudClient(bucket_name=BUCKET_NAME)
-    snowflake_client = SnowflakeClient()
+    snowflake_client = SnowflakeClient(stages_data_path=STAGE_ROOT_PATH)
     file_service_client = FileServiceClient(output_root=DATA_OUTPUT_PATH)
     
     # for each configuration file defined in config directory

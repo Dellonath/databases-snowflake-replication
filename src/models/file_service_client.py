@@ -11,19 +11,16 @@ class FileServiceClient:
 
     def __init__(
             self,
-            output_root: str='data',
-            checkpoint_root: str='checkpoints') -> None:
+            output_root: str='data') -> None:
 
         """
         A class to handle writing data to files in different formats.
         
         Args:
             output_root (str): The root directory where files will be saved.
-            checkpoint_root (str): The root directory where checkpoints will be stored.
         """
 
         self.output_root = output_root
-        self.checkpoint_root = checkpoint_root
 
     def write(
             self,
@@ -45,9 +42,6 @@ class FileServiceClient:
         directory_path, table_name, file_name, file_format = self._parse_path(file_path=file_path)
         os.makedirs(name=directory_path, exist_ok=True)
 
-        # checkpoint_path = directory_path.replace(self.output_root, self.checkpoint_root)
-        # os.makedirs(name=checkpoint_path, exist_ok=True)
-
         if file_format == 'parquet':
             self._write_parquet(file_path=file_path,
                                 table_data=table_data,
@@ -60,9 +54,6 @@ class FileServiceClient:
                             table_columns=table_columns,
                             table_name=table_name)
 
-        # writing checkpoint file    
-        # checkpoint_path = f'{checkpoint_path}/checkpoint'
-        # self._write_checkpoint(file_path=checkpoint_path, last_file_checkpoint=file_name)
 
     def delete_file(
         self,
@@ -83,23 +74,6 @@ class FileServiceClient:
             _log.error(f"Error deleting file {file_path}: {e}")
         except FileNotFoundError:
             _log.error(f"File {file_path} not found for deletion.")
-
-    # def _write_checkpoint(
-    #     self,
-    #     file_path: str,
-    #     last_file_checkpoint: str
-    # ) -> None:
-
-    #     """
-    #     Write checkpoint files for each table to track the ingestion
-        
-    #     Args:
-    #         file_path (str): The path of the checkpoint.
-    #         last_file_checkpoint (str): Last file name (data of checkpoint)
-    #     """
-
-    #     with open(file=file_path, mode='w', encoding='utf-8') as f:
-    #         f.write(last_file_checkpoint)
 
     def _parse_path(
         self,

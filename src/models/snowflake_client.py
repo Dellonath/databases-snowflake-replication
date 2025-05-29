@@ -13,7 +13,7 @@ class SnowflakeClient:
         __connection (snowflake.connector): The Snowflake connection object.
     """
     
-    def __init__(self):
+    def __init__(self, database: str = 'CARASSO_POC_DB', stages_data_path: str = None) -> None:
         
         """
         Initialize the SnowflakeClient and establish a connection to the Snowflake database.
@@ -21,11 +21,14 @@ class SnowflakeClient:
         """
         
         self.__connection = self.__connect_to_snowflake()
+        self.__sf_database = database.upper()
+        self.__stages_data_path = stages_data_path
 
     def execute_query(self, query) -> list:
         
         """
         Execute a query on the Snowflake database.
+        
         Args:
             query (str): The SQL query to execute.
         """
@@ -33,9 +36,9 @@ class SnowflakeClient:
         try:
             with self.__connection.cursor() as cursor:
                 cursor.execute(query)
-                tables = [row for row in cursor.fetchall()]
+                rows = [row for row in cursor.fetchall()]
                 
-            return tables
+            return rows
         
         except Exception as e:
             _log.error(f"Error executing query '{query}' in Snowflake: {e}")
@@ -48,14 +51,13 @@ class SnowflakeClient:
         file_format: str
     ) -> None:
         
-        database_upper = 'CARASSO_POC_DB'
         schema_upper = schema.upper()
         table_upper = table.upper()
         file_format_upper = file_format.upper()
         
-        self.execute_query(f"CREATE DATABASE IF NOT EXISTS {database_upper};")
-        self.execute_query(f"CREATE SCHEMA IF NOT EXISTS {database_upper}.{schema_upper};")
-        self.execute_query(f"USE {database_upper}.{schema_upper};")
+        self.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.__sf_database};")
+        self.execute_query(f"CREATE SCHEMA IF NOT EXISTS {self.__sf_database}.{schema_upper};")
+        self.execute_query(f"USE {self.__sf_database}.{schema_upper};")
         
         self.execute_query(f"""
             CREATE OR REPLACE FILE FORMAT CARASSO_PARQUET_SCHEMA_EVOLUTION
@@ -73,7 +75,7 @@ class SnowflakeClient:
         self.execute_query(f"""
             CREATE STAGE IF NOT EXISTS stage_{table}
                 STORAGE_INTEGRATION=CT_CARASSO_AWS
-                URL='s3://ct-carasso-poc/data/{schema}/{table}/'
+                URL='{self.__stages_data_path}/{schema}/{table}/'
                 FILE_FORMAT=CARASSO_{file_format_upper}_SCHEMA_EVOLUTION;
         """)
         
@@ -95,7 +97,6 @@ class SnowflakeClient:
                 MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE
                 FILE_FORMAT = CARASSO_{file_format_upper}_SCHEMA_EVOLUTION;
         """)
-    
     
     def __connect_to_snowflake(self) -> snowflake.connector:
         

@@ -30,7 +30,7 @@ class CloudClient:
 
         try:
             self.__s3_client.upload_file(Key=file_path, Bucket=self.__bucket_name, Filename=file_path)
-            _log.info(f"File '{file_path}' uploaded Cloud Storage's Service.")
+            _log.info(f"File '{file_path}' uploaded Cloud Storage.")
             return True
         except FileNotFoundError:
             _log.error(f"The file '{file_path}' was not found.")
@@ -69,6 +69,6 @@ class CloudClient:
             if upload_status:
                 os.remove(path=file_path)
 
-        _log.info(f"All files from '{directory_path}' have been uploaded to Cloud.")
+        _log.info(f"All files from '{directory_path}' have been uploaded to Cloud Storage.")
         
         return True
