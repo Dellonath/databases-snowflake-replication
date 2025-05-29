@@ -1,0 +1,14 @@
+replicate: true
+file_format: parquet
+db_connection:
+  engine: mysql+pymysql
+  host: localhost
+  port: 3307
+  username: root
+  password: mysql_password
+  database: fakeDatabase
+tables:
+  - table_name: users
+    mode: full_load
+  - table_name: Products
+    mode: full_load

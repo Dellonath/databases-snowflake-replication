@@ -1,0 +1,24 @@
+config_enabled: true
+file_format: parquet
+db_connection:
+  engine: mysql+pymysql
+  host: localhost
+  port: 3307
+  username: root
+  password: mysql_password
+  database: tafnit_116
+tables:
+  - table_name: users
+    ingestion_mode: full_load
+  - table_name: products
+    ingestion_mode: full_load
+  - table_name: orders
+    ingestion_mode: full_load
+  - table_name: categories
+    ingestion_mode: full_load
+  - table_name: reviews
+    ingestion_mode: full_load
+  - table_name: product_categories
+    ingestion_mode: full_load
+  - table_name: product_categories_missing
+    ingestion_mode: full_load

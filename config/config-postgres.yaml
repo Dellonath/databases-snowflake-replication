@@ -1,0 +1,32 @@
+config_enabled: true
+file_format: csv
+db_connection:
+  engine: postgresql+psycopg2
+  host: localhost
+  port: 5432
+  username: postgres
+  password: postgres_password
+  database: postgres
+  schema: public
+tables:
+  - table_name: customers
+    ingestion_mode: full_load
+  - table_name: items
+    ingestion_mode: full_load
+  - table_name: transactions
+    ingestion_mode: full_load
+  - table_name: departments
+    ingestion_mode: full_load
+  - table_name: product_reviews
+    ingestion_mode: full_load
+  - table_name: item_department_links
+    ingestion_mode: full_load
+  - table_name: item_department_links_doesnt_exist
+    ingestion_mode: full_load
+  - table_name: item_department_links_wrong_ingestion_mode
+    ingestion_mode: incrementall
+    incremental_column: id
+  - table_name: item_department_links_replicate_false
+    ingestion_mode: incremental
+    incremental_column: id
+    replicate: false
