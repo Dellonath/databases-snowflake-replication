@@ -1,0 +1,45 @@
+config_enabled: true
+description: Postgres replication of sales and products data
+cloud:
+  provider: aws
+  s3_bucket: ct-carasso-poc
+snowflake_connection:
+  account: sw_account
+  user: sw_user
+  password: sw_password
+  role: sw_role
+  warehouse: COMPUTE_WH
+  database: CARASSO_POC_DB
+  schema: POTSGRES
+database_connection:
+  engine: postgresql+psycopg2
+  host: localhost
+  port: 5432
+  username: postgres
+  password: postgres_password
+  database: postgres
+  schema: public
+extraction_file:
+  file_format: csv
+tables:
+  - table_name: customers
+    ingestion_mode: full_load
+  - table_name: items
+    ingestion_mode: full_load
+  - table_name: transactions
+    ingestion_mode: full_load
+  - table_name: departments
+    ingestion_mode: full_load
+  - table_name: product_reviews
+    ingestion_mode: full_load
+  - table_name: item_department_links
+    ingestion_mode: full_load
+  - table_name: item_department_links_doesnt_exist
+    ingestion_mode: full_load
+  - table_name: item_department_links_wrong_ingestion_mode
+    ingestion_mode: incrementall
+    incremental_column: id
+  - table_name: item_department_links_replicate_false
+    ingestion_mode: incremental
+    incremental_column: id
+    replicate: false

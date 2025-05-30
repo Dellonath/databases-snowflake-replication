@@ -1,0 +1,27 @@
+config_enabled: false
+description: Disabled configuration for testing purposes
+cloud:
+  provider: aws
+  s3_bucket: ct-carasso-poc
+snowflake_connection:
+  account: sw_account
+  user: sw_user
+  password: sw_password
+  role: sw_role
+  warehouse: COMPUTE_WH
+  database: CARASSO_POC_DB
+  schema: DISABLED_DB
+database_connection:
+  engine: mysql+pymysql
+  host: localhost
+  port: 3307
+  username: root
+  password: mysql_password
+  database: fakeDatabase
+extraction_file:
+  file_format: csv
+tables:
+  - table_name: users
+    mode: full_load
+  - table_name: Products
+    mode: full_load
