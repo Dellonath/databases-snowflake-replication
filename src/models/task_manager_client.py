@@ -2,7 +2,7 @@ import datetime
 from concurrent.futures import ThreadPoolExecutor
 from models.database_client import DatabaseClient
 from models.file_service_client import FileServiceClient
-from models.cloud_client import CloudClient
+from models.cloud_client import (AWSCloudClient, GCPCloudClient)
 from models.snowflake_client import SnowflakeClient
 from logs.logger import _log
 
@@ -13,53 +13,46 @@ class TaskManagerClient:
     def __init__(
         self,
         database_client: DatabaseClient,
-        file_service_client: FileServiceClient,
-        cloud_client: CloudClient,
+        cloud_client: AWSCloudClient | GCPCloudClient,
         snowflake_client: SnowflakeClient,
-        output_path: str,
-        max_workers: int,
-        valid_ingestion_modes: list,
-        valid_file_formats: list,
+        file_service_client: FileServiceClient,
         upload_remaining_files: bool = True
     ) -> None:
 
         """
-        Initialize the ExtractionOrchestrator with a database client and file writer.
-        
-        Args:
-            database_client (DatabaseClient): The client to interact with the database.
-            file_service_client (FileServiceClient): The client to write files.
-            cloud_client (CloudClient): The client to upload files to cloud storage.
-            snowflake_client (SnowflakeClient): The client to interact with Snowflake.
-            output_path (str): The path where the output files will be saved.
-            max_workers (int): The maximum number of threads to use for concurrent execution
-            valid_ingestion_modes (list): List of valid ingestion modes ('incremental', 'full_load').
-            valid_file_formats (list): List of valid file formats ('csv', 'parquet').
-            upload_remaining_files (bool): Whether to upload remaining files after processing. Defaults to True.
+        Initialize the ExtractionOrchestrator with a database client and file writer
+    
+        :param DatabaseClient database_client: The client to interact with the database
+        :param AWSCloudClient | GCPCloudClient cloud_client: The client to upload files to cloud
+        :param SnowflakeClient snowflake_client: The client to interact with Snowflake
+        :param FileServiceClient file_service_client: The client to write/delete files locally
+        :param bool upload_remaining_files: Flag to indicate whether to upload remaining files to cloud
         """
 
         self.__database_client = database_client
-        self.__file_service_client = file_service_client
         self.__cloud_client = cloud_client
         self.__snowflake_client = snowflake_client
-        self.output_path = output_path
-        self.max_workers = max_workers
-        self.valid_ingestion_modes = valid_ingestion_modes
-        self.valid_file_formats = valid_file_formats
-        self.upload_remaining_files = upload_remaining_files
-
-    def _create_query(
+        self.__file_service_client = file_service_client
+        self.__upload_remaining_files = upload_remaining_files
+        
+    def __create_query(
         self,
         table_name: str,
         ingestion_mode: str,
-        incremental_column: str=None
+        incremental_column: str=None,
+        where: str=None,
+        **kwargs
     ) -> str:
 
         if ingestion_mode == 'incremental':
-            query = (
-                f"SELECT * FROM {table_name} "
-                f"WHERE {incremental_column} > (SELECT MAX({incremental_column}) FROM {table_name})"
-            )
+            query = F"""
+                SELECT 
+                    * 
+                FROM {table_name} 
+                WHERE 
+                    {incremental_column} > (SELECT MAX({incremental_column}) FROM {table_name})
+                    {'AND '+where if where else ''}'
+            """
         elif ingestion_mode == 'full_load':
             query = f"SELECT * FROM {table_name}"
 
@@ -70,122 +63,105 @@ class TaskManagerClient:
         table_name: str,
         ingestion_mode: str,
         incremental_column: str=None,
-        file_format: str='parquet'
+        where: str=None,
+        **kwargs
     ) -> None:
 
         """
         Define the task to be executed by each task in multi threading.
         
-        Args:
-            table_name (str): The name of the table to extract data from.
-            ingestion_mode (str): The ingestion mode of extraction ('incremental' or 'full_load').
-            incremental_column (str, optional): The column to use for incremental extraction.
-            file_format (str, optional): The format of the output file ('csv' or 'parquet').
-        
+        :param str table_name: The name of the table to extract data from
+        :param str ingestion_mode: The ingestion mode of extraction ('incremental' or 'full_load')
+        :param str incremental_column (optional): The column to use for incremental extraction
+        :param str where (optional): Additional WHERE clause for filtering data
         """
         
         database = self.__database_client.database
         
-        query = self._create_query(table_name=table_name,
-                                   ingestion_mode=ingestion_mode,
-                                   incremental_column=incremental_column)
+        query = self.__create_query(table_name=table_name,
+                                    ingestion_mode=ingestion_mode,
+                                    incremental_column=incremental_column,
+                                    where=where,
+                                    **kwargs)
 
-        _log.info(f"Starting querying table: table='{database}.{table_name}' ingestion_mode='{ingestion_mode}'")
-        result = self.__database_client.execute_query(query=query)
+        _log.info(f"Starting querying table '{database}.{table_name}' in mode '{ingestion_mode}'")
+        data = self.__database_client.execute_query(query=query)
         
-        if result is None:
+        if not data:
+            _log.warning(f"No data extracted from table '{database}.{table_name}'. Stopping task...")
             return
+        _log.info(f"Total of {len(data)} rows were extracted from '{database}.{table_name}'")
+
+        table_columns = self.__database_client.tables_columns[table_name]
         
-        _log.info(f"Rows were extracted: table='{database}.{table_name}' rows={len(result)}")
-    
-        table_columns = self.__database_client.get_table_columns(table_name=table_name)
+        # setting the temp directory path to store the files in a temporary location
+        tmp_directory_path = (
+            f'{self.__file_service_client.tmp_local_directory}/'
+            f'{database}/'
+            f'{table_name}'
+        )
         
-        root_file_path = f"{self.output_path}/{database}/{table_name}"
-        
+        # defining the full qualified file path in the temporary location
         timestamp = datetime.datetime.now().strftime(format='%Y%m%d%H%M%S')
-        file_path = f"{root_file_path}/{timestamp}.{file_format}"
-        self.__file_service_client.write(file_path=file_path,
-                                         table_data=result,
-                                         table_columns=table_columns,
-                                         file_format=file_format)
+        file_path = (
+            f'{tmp_directory_path}/'
+            f'{timestamp}.{self.__file_service_client.file_format}'
+        )
+        
+        self.__file_service_client.write_file(file_path=file_path,
+                                              table_data=data,
+                                              table_columns=table_columns)
         
         # uploading file to cloud storage
-        _log.info(f"Uploading file: table='{database}.{table_name}' path='{file_path}'")
         status = self.__cloud_client.upload_file(file_path=file_path)
         if status:
             self.__file_service_client.delete_file(file_path=file_path)
         
-        # uploading remaining files if the flag is set
-        if self.upload_remaining_files:
-            _log.info(f"Uploading remaining files: table='{database}.{table_name}'")
-            glob_file_path = f"{root_file_path}/*"
-            self.__cloud_client.upload_all_remaining_files(directory_path=glob_file_path)
-        else:
-            _log.info(f"Skipping uploading remaining files: table='{database}.{table_name}'")
+        # uploading remaining files wheter the flag is set as true
+        if self.__upload_remaining_files:
+            remaining_files = self.__file_service_client.list_files_in_directory(
+                directory_path=tmp_directory_path
+            )
+            for remaining_file in remaining_files:
+                _log.info(f"Uploading remaining file: '{remaining_file}'")
+                status = self.__cloud_client.upload_file(file_path=remaining_file)
+                
+                if status:
+                    self.__file_service_client.delete_file(file_path=remaining_file)
             
         # uploading data to Snowflake
-        _log.info(f"Uploading data to Snowflake: table='{database}.{table_name}'")
-        self.__snowflake_client.setup_snowflake_stage_schema_table(schema=database,
-                                                                   table=table_name,
-                                                                   file_format=file_format)
+        _log.info(f"Uploading data of table '{database}.{table_name}' to Snowflake:")
+        self.__snowflake_client.setup_snowflake_stage_schema_table(
+            schema=database,
+            table=table_name,
+            file_format=self.__file_service_client.file_format
+        )
         
         _log.info(f"Task completed: table='{database}.{table_name}'")
         
-    def multithreading_job(
+    def start_replication(
             self,
             tables_configs: list,
-            file_format: str='csv'
+            max_workers: int=5,
+            thread_name_prefix: str='TaskManagerClientThread'
         ) -> None:
         
         """
-        A utility function to run a job in a multithreaded environment.
+        A utility function to run a job in a multithreaded environment
         
-        Args:
-            task_function (callable): The function to run in a thread.
-            tables_configs (list): A list of table configurations to process.
-            upload_remaining_files (bool): Whether to upload remaining files after processing. Defaults to True.
-            file_format (str): The file format to use for the output files. Defaults to 'csv'.
+        :param list tables_configs: A list of dictionaries containing table configurations
+        :param int max_workers: The maximum number of threads to use for parallel processing
+        :param str thread_name_prefix: The prefix for the thread names
         """
-        
-        database = self.__database_client.database
-        
-        _log.info(f"Starting database extraction: database='{database}' total_tables: {len(tables_configs)}")
-        
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
 
-            tasks = []
-            for table_config in tables_configs:
+        with ThreadPoolExecutor(max_workers=max_workers,
+                                thread_name_prefix=thread_name_prefix) as executor:
 
-                replicate = table_config.get('replicate', True)
-                table_name = table_config.get('table_name')
-                ingestion_mode = table_config.get('ingestion_mode')
-                incremental_key = table_config.get('incremental_column')
-                
-                # table ingestion validations
-                if not replicate:
-                    _log.info(f"Skipping table '{database}.{table_name}': replicate=false")
-                    continue
-                
-                if not all([table_name, ingestion_mode]):
-                    _log.error(f"Invalid table configuration: {table_config}. Check if configs are set")
-                    continue
-                
-                if ingestion_mode not in self.valid_ingestion_modes:
-                    _log.error(f"Invalid ingestion mode '{ingestion_mode}' defined: table='{database}.{table_name}'. Expected {self.valid_ingestion_modes}")
-                    continue
-                
-                if ingestion_mode == 'incremental' and not incremental_key:
-                    _log.error(f"No incremental ingestion key defined: table='{database}.{table_name}'")
-                    continue
-
-                _log.info(f"Creating extraction's task for '{database}.{table_name}'")
-                tasks.append(
-                    executor.submit(self.__task_definition,
-                                    table_name=table_name,
-                                    ingestion_mode=ingestion_mode,
-                                    incremental_column=incremental_key,
-                                    file_format = file_format)
-                )
+            tasks = [
+                executor.submit(self.__task_definition,
+                                **table_config)
+                for table_config in tables_configs
+            ]
 
         # wait for all tasks to finish
         for task in tasks:

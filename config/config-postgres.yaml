@@ -1,6 +1,8 @@
 config_enabled: true
-file_format: csv
-db_connection:
+description: Postgres replication of sales and products data
+extraction_file:
+  file_format: csv
+database_connection:
   engine: postgresql+psycopg2
   host: localhost
   port: 5432

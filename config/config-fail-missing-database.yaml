@@ -1,6 +1,7 @@
-replicate: true
-file_format: parquet
-db_connection:
+config_enabled: true
+extraction_file:
+  file_format: csv
+database_connection:
   engine: mysql+pymysql
   host: localhost
   port: 3307

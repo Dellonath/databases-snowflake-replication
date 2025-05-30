@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import (OperationalError, 
                             DatabaseError, 
@@ -5,39 +7,46 @@ from sqlalchemy.exc import (OperationalError,
                             NoSuchTableError)
 from logs.logger import _log
 
+load_dotenv()
+
 class DatabaseClient:
 
     """Class to manage database connections and execute queries."""
 
     def __init__(
         self,
-        db_engine: str,
+        engine: str,
         host: str,
+        port: int,
         username: str,
         password: str,
         database: str,
-        port: int
+        schema: str=None,
+        **kwargs
     ) -> None:
 
         """
         Initialize the DatabaseClient with connection parameters.
         
-        Args:
-            db_engine (str): The database engine (e.g., 'mysql-pymysql').
-            host (str): The database host.
-            username (str): The database username.
-            password (str): The database password.
-            database (str): The name of the database.
-            port (int, optional): The port number.
+        :param str engine: The database engine (e.g., 'mysql-pymysql', 'postgresql+psycopg2')
+        :param str host: The database host
+        :param int port: The port number
+        :param str username: The database username
+        :param str password: The database password
+        :param str database: The name of the database
+        :param str schema: The name of the schema to connect to. Defaults is the database name
         """
 
-        self.__db_engine = db_engine
+        self.__engine = engine
         self.__host = host
+        self.__port = port
         self.__username = username
-        self.__password = password
+        self.__password = os.environ.get(password)
         self.database = database
-        self.port = port
-        self.__engine = self.__establish_db_connection()
+        self.schema = database if schema is None else schema
+        self.__db_engine = self.__create_engine()
+        self.existing_source_tables = self.__list_source_tables()
+        self.tables_columns = self.__list_source_tables_columns()
 
     def execute_query(
         self,
@@ -45,87 +54,72 @@ class DatabaseClient:
     ) -> list:
 
         """
-        Execute a SQL query and return the result.
+        Execute a SQL query and return the result
 
-        Args:
-            query (str): The SQL query to execute.
+        :param str query: The SQL query to execute
         """
 
         try:
-            with self.__engine.connect() as connection:
+            with self.__db_engine.connect() as connection:
                 result = connection.execute(statement=text(query))
                 rows = result.fetchall()
                 
             return rows
-
         except ProgrammingError as e:
             _log.error(e)
         except NoSuchTableError as e:
             _log.error(e)
         except DatabaseError as e:
             _log.error(e)
-
-    def get_table_columns(
-        self,
-        table_name: str
-    ) -> list:
-
-        """
-        Get the columns of a table.
-        
-        Args:
-            table_name (str): The name of the table.
-        """
-
-        try:
-            inspector = inspect(subject=self.__engine)
-            columns = inspector.get_columns(table_name=table_name)
-            return [column['name'] for column in columns]
-        except ProgrammingError as e:
-            _log.error(e)
-        except DatabaseError as e:
+        except OperationalError as e:
             _log.error(e)
 
         return []
-    
-    def get_source_database_tables(
-        self,
-        db_engine: str | None = None,
-        schema_name: str='public'
+
+    def __list_source_tables_columns(
+        self
+    ) -> dict[str, list[str]]:
+
+        """Get the columns of a table"""
+
+        tables_columns = dict()
+        for table_name in self.existing_source_tables:
+            try:
+                inspector = inspect(subject=self.__engine)
+                columns = inspector.get_columns(table_name=table_name)
+                self.tables_columns[table_name] = [column['name'] for column in columns]
+            except ProgrammingError as e:
+                _log.error(e)
+            except DatabaseError as e:
+                _log.error(e)
+                
+        return tables_columns
+
+    def __list_source_tables(
+        self
     ) -> set:
 
-        """
-        Get the list of tables in a schema.
-        
-        Args:
-            db_engine (str): The engine to specify the correct query considering the database
-            schema_name (str): The schema name
-        """
+        """Get the list of tables in a schema"""
 
-        if 'mysql' in db_engine or 'postgresql' in db_engine:
-            query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
-            
+        if 'mysql' in self.__engine or 'postgresql' in self.__engine:
+            query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{self.schema}'"
+
         return {table_config[0] for table_config in self.execute_query(query=query)}
     
-    def __establish_db_connection(
+    def __create_engine(
         self
     ) -> None:
 
         """Create a database connection"""
     
-        if self.__db_engine == 'postgresql+psycopg2':
-            url = f'{self.__db_engine}://{self.__username}:{self.__password}@{self.__host}/{self.database}'
-        elif self.__db_engine == 'mysql+pymysql':
-            url = f'{self.__db_engine}://{self.__username}:{self.__password}@{self.__host}:{self.port}/{self.database}'
-        
+        if self.__engine == 'postgresql+psycopg2':
+            url = f'{self.__engine}://{self.__username}:{self.__password}@{self.__host}/{self.database}'
+        elif self.__engine == 'mysql+pymysql':
+            url = f'{self.__engine}://{self.__username}:{self.__password}@{self.__host}:{self.__port}/{self.database}'
+
         try:
             engine = create_engine(url=url)
             _log.info(f"Connection for '{self.database}' database established successfully")       
             return engine
         except OperationalError as e:
             _log.error(e)
-            
-    def __del__(self) -> None:
-        self.__engine.dispose()
-        _log.info(f"Source database '{self.database}' connection closed successfully")
-        

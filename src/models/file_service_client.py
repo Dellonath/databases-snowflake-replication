@@ -1,5 +1,6 @@
 import os
 import csv
+import glob
 import pyarrow as pa
 import pyarrow.parquet as pq
 from logs.logger import _log
@@ -7,53 +8,69 @@ from logs.logger import _log
 
 class FileServiceClient:
 
-    """A class to handle writing data to files in different formats."""
+    """A class to handle writing data to files in different formats"""
 
     def __init__(
-            self,
-            output_root: str='data') -> None:
+        self,
+        tmp_local_directory: str='tmp',
+        file_format: str='parquet'
+    ) -> None:
 
         """
-        A class to handle writing data to files in different formats.
+        A class to handle writing data to files in different formats
         
-        Args:
-            output_root (str): The root directory where files will be saved.
+        :param str tmp_local_directory (optional): The root local directory where files will be saved temporarily
+        :param str file_format (optional): The format of the output files ('csv' or 'parquet')
         """
 
-        self.output_root = output_root
+        self.tmp_local_directory = tmp_local_directory
+        self.file_format = file_format
 
-    def write(
-            self,
-            file_path: str,
-            table_data: list,
-            table_columns: list[str],
-            file_format: str='parquet') -> None:
-
-        """
-        Write data to a file in the specified format.
+    def list_files_in_directory(
+        self,
+        directory_path: str
+    ) -> list[str]:
         
-        Args:
-            file_path (str): The full file output path.
-            table_data (list): The data to write.
-            table_columns (list[str]): The column names.
-            file_format (str): The format of the output file ('csv' or 'parquet').
+        """
+        List all files in a directory
+        
+        :param str directory_path: The path to the directory to search for files
+        :return: A list of file paths matching the specified pattern
         """
 
-        directory_path, table_name, file_name, file_format = self._parse_path(file_path=file_path)
-        os.makedirs(name=directory_path, exist_ok=True)
+        pattern = f'{directory_path}/*'
+        files = glob.glob(pattern)
+        _log.info(f"Found {len(files)} files in '{directory_path}'")
+        
+        return files
 
-        if file_format == 'parquet':
-            self._write_parquet(file_path=file_path,
+    def write_file(
+        self,
+        file_path: str,
+        table_data: list,
+        table_columns: list[str]
+    ) -> None:
+
+        """
+        Write data to a file in the specified format
+        
+        :param str file_path: The full file output path
+        :param list table_data: The data to write
+        :param list[str] table_columns: The table columns names
+        """
+
+        # creating table directory if it does not exist in local storage
+        os.makedirs(name=os.path.dirname(file_path), exist_ok=True)
+
+        _log.info(f"Writing data to path: '{file_path}'")
+        if self.file_format == 'parquet':
+            self.__write_parquet(file_path=file_path,
                                 table_data=table_data,
-                                table_columns=table_columns,
-                                table_name=table_name)
-
-        elif file_format == 'csv':
-            self._write_csv(file_path=file_path,
+                                table_columns=table_columns)
+        elif self.file_format == 'csv':
+            self.__write_csv(file_path=file_path,
                             table_data=table_data,
-                            table_columns=table_columns,
-                            table_name=table_name)
-
+                            table_columns=table_columns)
 
     def delete_file(
         self,
@@ -61,10 +78,9 @@ class FileServiceClient:
     ) -> None:
 
         """
-        Delete a file.
+        Delete a file
         
-        Args:
-            file_path (str): The path to the file to delete.
+        :param str file_path: The path to the file to delete.
         """
 
         try:
@@ -75,46 +91,19 @@ class FileServiceClient:
         except FileNotFoundError:
             _log.error(f"File {file_path} not found for deletion.")
 
-    def _parse_path(
-        self,
-        file_path: str
-    ) -> tuple:
-
-        """
-        Separate file path into components
-        
-        Args:
-            path (str): The path.
-        """
-
-        # extract the directory path
-        # assuming the file path is in the format 'directory/table_name.file_format'
-        directory_path = os.path.dirname(file_path)
-
-        # extract table name and file format from the file path
-        # assuming the file name is in the format 'table_name.file_format'
-        table_name = file_path.split('/')[-2]
-        file_name = file_path.split('/')[-1]
-        file_format = file_path.split('.')[-1]
-
-        return directory_path, table_name, file_name, file_format
-
-    def _write_csv(
+    def __write_csv(
         self,
         file_path: str,
         table_data: list,
-        table_columns: list[str],
-        table_name: str
+        table_columns: list[str]
     ) -> None:
 
         """
-        Write data to a CSV file.
+        Write data as CSV file
         
-        Args:
-            file_path (str): The path to the CSV file.
-            table_data (list): The data to write.
-            table_columns (list[str]): The column names.
-            table_name (str): The name of the table.
+        :param str file_path: The path to the CSV file
+        :param list table_data: The data to write
+        :param list[str] table_columns: The column names
         """
 
         try:
@@ -123,26 +112,23 @@ class FileServiceClient:
                 writer.writerow(table_columns)
                 writer.writerows(table_data)
         except OSError as e:
-            _log.error(f"File system error writing CSV for '{table_name}': '{e}'")
+            _log.error(e)
         except csv.Error as e:
-            _log.error(f"CSV error for '{table_name}': '{e}'")
+            _log.error(e)
 
-    def _write_parquet(
+    def __write_parquet(
         self,
         file_path: str,
         table_data: list,
-        table_columns: list[str],
-        table_name: str
+        table_columns: list[str]
     ) -> None:
 
         """
-        Write data to a PARQUET file.
+        Write data as Parquet file
         
-        Args:
-            file_path (str): The path to the PARQUET file.
-            table_data (list): The data to write.
-            table_columns (list[str]): The column names.
-            table_name (str): The name of the table.
+        :param str file_path: The path to the PARQUET file
+        :param list table_data: The data to write
+        :param list[str] table_columns: The column names
         """
 
         try:
@@ -152,6 +138,6 @@ class FileServiceClient:
             table = pa.table(data_dict)
             pq.write_table(table=table, where=file_path)
         except OSError as e:
-            _log.error(f"File system error writing PARQUET for '{table_name}': '{e}'")
+            _log.error(e)
         except TypeError as e:
-            _log.error(f"Type error writing PARQUET for '{table_name}': '{e}'")
+            _log.error(e)

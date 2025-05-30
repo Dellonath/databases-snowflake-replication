@@ -1,6 +1,8 @@
 config_enabled: true
-file_format: parquet
-db_connection:
+description: TAFNIT 116 Replication Configuration
+extraction_file:
+  file_format: parquet
+database_connection:
   engine: mysql+pymysql
   host: localhost
   port: 3307
