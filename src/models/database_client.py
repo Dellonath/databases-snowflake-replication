@@ -5,7 +5,7 @@ from sqlalchemy.exc import (OperationalError,
                             DatabaseError, 
                             ProgrammingError, 
                             NoSuchTableError)
-from logs.logger import _log
+from ..logs.logger import _log
 
 load_dotenv()
 

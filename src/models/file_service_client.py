@@ -3,7 +3,7 @@ import csv
 import glob
 import pyarrow as pa
 import pyarrow.parquet as pq
-from logs.logger import _log
+from ..logs.logger import _log
 
 
 class FileServiceClient:

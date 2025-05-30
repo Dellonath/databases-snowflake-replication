@@ -2,12 +2,12 @@ import os
 import datetime
 import yaml
 from dotenv import load_dotenv
-from models.database_client import DatabaseClient
-from models.task_manager_client import TaskManagerClient
-from models.file_service_client import FileServiceClient
-from models.cloud_client import CloudClient
-from models.snowflake_client import SnowflakeClient
-from logs.logger import _log
+from .models.database_client import DatabaseClient
+from .models.task_manager_client import TaskManagerClient
+from .models.file_service_client import FileServiceClient
+from .models.cloud_client import CloudClient
+from .models.snowflake_client import SnowflakeClient
+from .logs.logger import _log
 
 load_dotenv()
 
@@ -22,7 +22,7 @@ VALID_ENGINES = ['mysql+pymysql', 'postgresql+psycopg2']
 VALID_CLOUD_PROVIDERS = ['aws']
 UPLOAD_REMAINING_FILES = False
 
-class App:
+class Main:
     
     """
     Main application class to orchestrate the data extraction process.
@@ -246,6 +246,3 @@ class App:
             _log.error(f"No incremental key defined for '{table_name}' in '{config_file_name}'. " 
                         f"Skipping table...")
             return True
-
-if __name__ == '__main__':
-    App()

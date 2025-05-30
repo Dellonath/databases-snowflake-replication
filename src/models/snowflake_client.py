@@ -1,7 +1,7 @@
 import os
 import snowflake.connector
 from dotenv import load_dotenv
-from logs.logger import _log
+from ..logs.logger import _log
 
 load_dotenv()
 

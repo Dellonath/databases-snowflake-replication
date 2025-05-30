@@ -1,5 +1,5 @@
-from models.clouds.aws import AWSCloudClient
-from models.clouds.gcp import GCPCloudClient
+from .clouds.aws import AWSCloudClient
+from .clouds.gcp import GCPCloudClient
 
 
 class CloudClient:

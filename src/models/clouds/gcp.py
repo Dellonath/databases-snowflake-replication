@@ -1,5 +1,5 @@
 import os
-from logs.logger import _log
+from ...logs.logger import _log
 
 class GCPCloudClient:
   
