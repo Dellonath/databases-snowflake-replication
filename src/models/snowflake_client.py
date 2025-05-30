@@ -6,6 +6,7 @@ from logs.logger import _log
 load_dotenv()
 
 class SnowflakeClient:
+
     """
     Class to manage connections and execute queries on a Snowflake database.
     This class uses environment variables for configuration and provides methods to execute SQL queries.
@@ -13,7 +14,11 @@ class SnowflakeClient:
         __connection (snowflake.connector): The Snowflake connection object.
     """
     
-    def __init__(self, database: str = 'CARASSO_POC_DB', stages_data_path: str = None) -> None:
+    def __init__(
+        self, 
+        database: str='CARASSO_POC_DB', 
+        stages_data_path: str = None
+    ) -> None:
         
         """
         Initialize the SnowflakeClient and establish a connection to the Snowflake database.
@@ -24,13 +29,15 @@ class SnowflakeClient:
         self.__sf_database = database.upper()
         self.__stages_data_path = stages_data_path
 
-    def execute_query(self, query) -> list:
+    def execute_query(
+        self, 
+        query
+    ) -> list:
         
         """
-        Execute a query on the Snowflake database.
+        Execute a query on the Snowflake database
         
-        Args:
-            query (str): The SQL query to execute.
+        :param str query: The SQL query to execute
         """
         
         try:
@@ -98,7 +105,9 @@ class SnowflakeClient:
                 FILE_FORMAT = CARASSO_{file_format_upper}_SCHEMA_EVOLUTION;
         """)
     
-    def __connect_to_snowflake(self) -> snowflake.connector:
+    def __connect_to_snowflake(
+        self
+    ) -> snowflake.connector:
         
         """
         Establish a connection to the Snowflake database using environment variables.
@@ -121,7 +130,9 @@ class SnowflakeClient:
         
         return connection
     
-    def __del__(self):
+    def __del__(
+        self
+    ) -> None:
         
         """Destructor to close the Snowflake connection."""
         

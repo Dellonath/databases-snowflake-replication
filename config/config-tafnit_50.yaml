@@ -1,5 +1,8 @@
 config_enabled: true
 description: TAFNIT 50 Replication Configuration
+cloud:
+  provider: aws
+  s3_bucket: ct-carasso-poc
 extraction_file:
   file_format: csv
 database_connection:

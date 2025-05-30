@@ -16,7 +16,7 @@ class TaskManagerClient:
         cloud_client: AWSCloudClient | GCPCloudClient,
         snowflake_client: SnowflakeClient,
         file_service_client: FileServiceClient,
-        upload_remaining_files: bool = True
+        upload_remaining_files: bool=True
     ) -> None:
 
         """
@@ -130,14 +130,14 @@ class TaskManagerClient:
                     self.__file_service_client.delete_file(file_path=remaining_file)
             
         # uploading data to Snowflake
-        _log.info(f"Uploading data of table '{database}.{table_name}' to Snowflake:")
+        _log.info(f"Uploading data of table '{database}.{table_name}' to Snowflake")
         self.__snowflake_client.setup_snowflake_stage_schema_table(
             schema=database,
             table=table_name,
             file_format=self.__file_service_client.file_format
         )
         
-        _log.info(f"Task completed: table='{database}.{table_name}'")
+        _log.info(f"Task completed for table '{database}.{table_name}'")
         
     def start_replication(
             self,

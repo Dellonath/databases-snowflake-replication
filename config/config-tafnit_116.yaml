@@ -1,5 +1,8 @@
 config_enabled: true
 description: TAFNIT 116 Replication Configuration
+cloud:
+  provider: aws
+  s3_bucket: ct-carasso-poc
 extraction_file:
   file_format: parquet
 database_connection:

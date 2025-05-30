@@ -85,14 +85,14 @@ class DatabaseClient:
         tables_columns = dict()
         for table_name in self.existing_source_tables:
             try:
-                inspector = inspect(subject=self.__engine)
+                inspector = inspect(subject=self.__db_engine)
                 columns = inspector.get_columns(table_name=table_name)
-                self.tables_columns[table_name] = [column['name'] for column in columns]
+                tables_columns[table_name] = [column['name'] for column in columns]
             except ProgrammingError as e:
                 _log.error(e)
             except DatabaseError as e:
                 _log.error(e)
-                
+        
         return tables_columns
 
     def __list_source_tables(

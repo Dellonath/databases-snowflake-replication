@@ -1,5 +1,5 @@
-config_enabled: true
-description: Configuration for testing missing database to mimic failure
+config_enabled: false
+description: Disabled configuration for testing purposes
 cloud:
   provider: aws
   s3_bucket: ct-carasso-poc

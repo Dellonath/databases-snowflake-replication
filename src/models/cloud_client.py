@@ -10,10 +10,10 @@ class CloudClient:
         client = CloudClient(cloud_name='aws', bucket_name='my-bucket')
     """
 
-    def __new__(cls, cloud_name: str, **kwargs):
-        if cloud_name.lower() == 'gcp':
+    def __new__(cls, provider: str, **kwargs):
+        if provider.lower() == 'gcp':
             return GCPCloudClient(**kwargs)
-        elif cloud_name.lower() == 'aws':
+        elif provider.lower() == 'aws':
             return AWSCloudClient(**kwargs)
         else:
-            raise ValueError(f"Unsupported cloud provider: {cloud_name}")
+            raise ValueError(f"Unsupported cloud provider: {provider}")

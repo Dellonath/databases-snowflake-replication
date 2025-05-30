@@ -1,3 +1,4 @@
+import os
 import boto3
 from boto3.exceptions import S3UploadFailedError
 from logs.logger import _log
@@ -8,13 +9,26 @@ class AWSCloudClient:
 
     def __init__(
             self,
+            s3_bucket: str,
+            aws_access_key_id: str=None,
+            aws_secret_access_key: str=None,
+            region: str=None,
             **kwargs
         ) -> None:
         
-        self.cloud_name = 'AWS'
-        self.cloud_storage_name = 'S3'
-        self.__storage_client = boto3.client('s3')
-        self.__bucket_name = kwargs.get('bucket_name')
+        self.cloud_name = 'aws'
+        self.cloud_storage_name = 's3'
+        self.__aws_access_key_id = os.getenv('aws_access_key_id')
+        self.__aws_secret_access_key = os.getenv('aws_secret_access_key')
+        self.__region = os.getenv('region')
+        self.__s3_bucket = s3_bucket
+        
+        self.__storage_client = boto3.client(
+            self.cloud_storage_name,
+            aws_access_key_id=self.__aws_access_key_id,
+            aws_secret_access_key=self.__aws_secret_access_key,
+            region_name=self.__region
+        )
 
     def upload_file(
             self, 
@@ -30,7 +44,7 @@ class AWSCloudClient:
         _log.info(f"Uploading file '{file_path}' into S3")
         try:
             self.__storage_client.upload_file(Key=file_path, 
-                                              Bucket=self.__bucket_name, 
+                                              Bucket=self.__s3_bucket, 
                                               Filename=file_path)
             _log.info(f"File '{file_path}' uploaded to S3 successfully")
             
@@ -41,36 +55,3 @@ class AWSCloudClient:
             _log.error(e)
 
         return False
-
-    # def upload_all_remaining_files(
-    #         self, 
-    #         directory_path: str
-    #     ) -> bool:
-      
-    #     """
-    #     Upload all files in a directory to the S3 bucket. This method searches for files matching 
-    #     the glob pattern in the specified directory and uploads them to the S3 bucket.
-    #     If the upload is successful, the file is deleted from the local directory. Else, files
-    #     were kept in the local directtory
-        
-    #     :param str directory_path: The local directory path containing files to upload
-    #     """
-
-    #     files = glob.glob(directory_path)
-    #     if not files:
-    #         _log.info(f"No files found in '{directory_path}' to upload.")
-    #         return False
-    #     else:
-    #         _log.info(f"Found {len(files)} files in '{directory_path}' to upload.")
-
-    #     for file_path in files:
-    #         _log.info(f"Uploading file: '{file_path}'")
-    #         upload_status = self.upload_file(file_path=file_path)
-
-    #         # delete file in local directory if upload was successful
-    #         if upload_status:
-    #             os.remove(path=file_path)
-
-    #     _log.info(f"All files from '{directory_path}' have been uploaded to Cloud Storage.")
-        
-    #     return True
