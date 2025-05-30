@@ -16,7 +16,7 @@ class DatabaseClient:
         username: str,
         password: str,
         database: str,
-        port: int=3306
+        port: int
     ) -> None:
 
         """
@@ -28,7 +28,7 @@ class DatabaseClient:
             username (str): The database username.
             password (str): The database password.
             database (str): The name of the database.
-            port (int, optional): The port number. Defaults to 3306.
+            port (int, optional): The port number.
         """
 
         self.__db_engine = db_engine
@@ -88,21 +88,24 @@ class DatabaseClient:
 
         return []
     
-    def get_tables_list(
+    def get_source_database_tables(
         self,
+        db_engine: str | None = None,
         schema_name: str='public'
-    ) -> list:
+    ) -> set:
 
         """
         Get the list of tables in a schema.
         
         Args:
-            schema_name (str): The schema name.
+            db_engine (str): The engine to specify the correct query considering the database
+            schema_name (str): The schema name
         """
 
-        query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
-        config_table_list = set(table_config[0] for table_config in self.execute_query(query=query))
-        return config_table_list
+        if 'mysql' in db_engine or 'postgresql' in db_engine:
+            query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
+            
+        return {table_config[0] for table_config in self.execute_query(query=query)}
     
     def __establish_db_connection(
         self

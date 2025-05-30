@@ -45,23 +45,24 @@ def load_config_file(
             parsed_config = yaml.safe_load(stream)
         except yaml.YAMLError as e:
             _log.error(e)
-    
     return parsed_config
 
-def filter_source_db_existing_tables(
-        database_client: DatabaseClient, 
-        db_name: str,
-        db_schema: str,
-        config_tables: list
+def filter_out_non_existent_tables_in_config(
+        config_tables: list,
+        source_db_tables: set,
+        source_db_name: str
     ) -> list:
-    
-    source_db_tables_list = database_client.get_tables_list(schema_name=db_schema)
-    config_file_tables_names = set(table['table_name'] for table in config_tables)
-    missing_tables = config_file_tables_names - source_db_tables_list
-    if missing_tables:
-        _log.warning(f"Tables don't exist on '{db_name}' and will be skipped: {missing_tables}")
-        
-    return [table for table in config_tables if table['table_name'] in source_db_tables_list]
+   
+    set_config_file_tables = {table['table_name'] for table in config_tables}
+    set_source_database_tables = set(source_db_tables)
+    non_existent_tables = ', '.join(set_config_file_tables.difference(set_source_database_tables))
+    if non_existent_tables:
+        _log.warning(f"Non-existent tables in '{source_db_name}' filtered out: {non_existent_tables}")   
+    return [
+        table_config 
+        for table_config in config_tables 
+        if table_config['table_name'] in set_source_database_tables
+    ]
 
 def main() -> None:
 
@@ -75,14 +76,13 @@ def main() -> None:
     snowflake_client = SnowflakeClient(stages_data_path=STAGE_ROOT_PATH)
     file_service_client = FileServiceClient(output_root=DATA_OUTPUT_PATH)
     
-    # for each configuration file defined in config directory
     for config_file_path in config_files_path:
         
         config = load_config_file(path=config_file_path)
 
         config_config_enabled = config.get('config_enabled', False)
         if not config_config_enabled:
-            _log.warning('Replication is set to False (config_enabled=false). Skipping...')
+            _log.warning(f"Replication set to False for '{config_file_path}'. Skipping...")
             continue
 
         config_file_format = config.get('file_format', 'csv').lower()
@@ -90,8 +90,16 @@ def main() -> None:
             _log.error(f"Invalid file format '{config_file_format}'. Expected one of {VALID_FILE_FORMATS}")
             continue
         
-        config_db_connection = config.get('db_connection')
+        config_db_connection = config.get('db_connection', {})
+        if not config_db_connection:
+            _log.error(f"No database connection parameters defined in '{config_file_path}'. Skipping...")
+            continue
+        
         config_db_engine = config_db_connection.get('engine').lower()
+        if config_db_engine not in VALID_ENGINES:
+            _log.error(f"Invalid database engine: {config_db_engine}. Expected one of {VALID_ENGINES}")
+            continue
+        
         config_db_host = config_db_connection.get('host')
         config_db_port = int(config_db_connection.get('port'))
         config_db_username = config_db_connection.get('username')
@@ -99,39 +107,35 @@ def main() -> None:
         config_db_database = config_db_connection.get('database')
         if not all([config_db_engine, config_db_host, config_db_port, 
                     config_db_username, config_db_password, config_db_database]):
-            _log.error(
-                f"Invalid database connection parameters. Check if configs are set: database='{config_db_database}'"
-            )
+            _log.error(f"Parameters missing for '{config_db_database}' connection")
             continue
-        
-        database_client = DatabaseClient(db_engine=config_db_engine,
-                                         host=config_db_host,
-                                         port=config_db_port,
-                                         username=config_db_username,
-                                         password=config_db_password,
-                                         database=config_db_database)
 
-        if not database_client.connection_status:
+        try:
+            database_client = DatabaseClient(
+                db_engine=config_db_engine,
+                host=config_db_host,
+                port=config_db_port,
+                username=config_db_username,
+                password=config_db_password,
+                database=config_db_database
+            )
+        except:
+            _log.error(f"Failed to establish connection. Skipping replication for database '{config_db_database}'")
             continue
-        
-        if config_db_engine not in VALID_ENGINES:
-            _log.error(f"Invalid database engine: {config_db_engine}. Expected one of {VALID_ENGINES}")
-            continue
-        
+
         config_tables_configs = config.get('tables', [])
-        if not config_tables_configs:
-            _log.error(f"No tables were listed to be replicated in {config}")
-            continue
-        
         config_db_schema = config_db_connection.get('schema', config_db_database)
         
-        config_db_schema = config_db_connection.get('schema', config_db_database)
-        filtered_config_tables_configs = filter_source_db_existing_tables(
-            database_client=database_client, 
+        source_database_tables = database_client.get_source_database_tables(schema_name=config_db_schema, 
+                                                                            db_engine=config_db_engine)
+        filtered_config_tables_configs = filter_out_non_existent_tables_in_config(
             config_tables=config_tables_configs,
-            db_name=config_db_database, 
-            db_schema=config_db_schema
+            source_db_tables=source_database_tables,
+            source_db_name=config_db_database
         )
+        if not filtered_config_tables_configs:
+            _log.error(f"No tables were listed to be replicated in after filtering {config}")
+            continue
         
         task_manager_client = TaskManagerClient(database_client=database_client,
                                                 file_service_client=file_service_client,
