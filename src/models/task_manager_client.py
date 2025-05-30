@@ -8,8 +8,6 @@ from ..logs.logger import _log
 
 class TaskManagerClient:
 
-    """Class to orchestrate the extraction of data from a database and save it to a file."""
-
     def __init__(
         self,
         database_client: DatabaseClient,
@@ -20,7 +18,7 @@ class TaskManagerClient:
     ) -> None:
 
         """
-        Initialize the ExtractionOrchestrator with a database client and file writer
+        Class to orchestrate the extraction of data from a database and save it to a file
     
         :param DatabaseClient database_client: The client to interact with the database
         :param AWSCloudClient | GCPCloudClient cloud_client: The client to upload files to cloud
@@ -68,7 +66,7 @@ class TaskManagerClient:
     ) -> None:
 
         """
-        Define the task to be executed by each task in multi threading.
+        Define the task to be executed by each task in multi threading
         
         :param str table_name: The name of the table to extract data from
         :param str ingestion_mode: The ingestion mode of extraction ('incremental' or 'full_load')
@@ -95,7 +93,7 @@ class TaskManagerClient:
         table_columns = self.__database_client.tables_columns[table_name]
         
         # setting the temp directory path to store the files in a temporary location
-        tmp_directory_path = (
+        local_tmp_directory_path = (
             f'{self.__file_service_client.tmp_local_directory}/'
             f'{database}/'
             f'{table_name}'
@@ -104,7 +102,7 @@ class TaskManagerClient:
         # defining the full qualified file path in the temporary location
         timestamp = datetime.datetime.now().strftime(format='%Y%m%d%H%M%S')
         file_path = (
-            f'{tmp_directory_path}/'
+            f'{local_tmp_directory_path}/'
             f'{timestamp}.{self.__file_service_client.file_format}'
         )
         
@@ -120,7 +118,7 @@ class TaskManagerClient:
         # uploading remaining files wheter the flag is set as true
         if self.__upload_remaining_files:
             remaining_files = self.__file_service_client.list_files_in_directory(
-                directory_path=tmp_directory_path
+                directory_path=local_tmp_directory_path
             )
             for remaining_file in remaining_files:
                 _log.info(f"Uploading remaining file: '{remaining_file}'")
@@ -130,7 +128,7 @@ class TaskManagerClient:
                     self.__file_service_client.delete_file(file_path=remaining_file)
             
         # uploading data to Snowflake
-        _log.info(f"Uploading data of table '{database}.{table_name}' to Snowflake")
+        _log.info(f"Setting up and ingesting data table '{database}.{table_name}' into Snowflake")
         self.__snowflake_client.setup_snowflake_stage_schema_table(
             schema=database,
             table=table_name,

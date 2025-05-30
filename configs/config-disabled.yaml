@@ -1,10 +1,16 @@
-config_enabled: true
-description: Configuration for testing missing database to mimic failure
+config_enabled: false
+description: Disabled configuration for testing purposes
 cloud:
   provider: aws
   s3_bucket: ct-carasso-poc
-extraction_file:
-  file_format: csv
+snowflake_connection:
+  account: sw_account
+  user: sw_user
+  password: sw_password
+  role: sw_role
+  warehouse: COMPUTE_WH
+  database: CARASSO_POC_DB
+  schema: DISABLED_DB
 database_connection:
   engine: mysql+pymysql
   host: localhost
@@ -12,6 +18,8 @@ database_connection:
   username: root
   password: mysql_password
   database: fakeDatabase
+extraction_file:
+  file_format: csv
 tables:
   - table_name: users
     mode: full_load

@@ -1,6 +1,7 @@
 import os
 import datetime
 import yaml
+import json
 from dotenv import load_dotenv
 from .models.database_client import DatabaseClient
 from .models.task_manager_client import TaskManagerClient
@@ -11,54 +12,53 @@ from .logs.logger import _log
 
 load_dotenv()
 
-CONFIG_FILES_PATH = 'config'
-TMP_LOCAL_PATH = 'data'
-MAX_WORKERS = 5
-BUCKET_NAME = os.getenv('aws_s3_bucket')
-STAGE_ROOT_PATH = f's3://{BUCKET_NAME}/{TMP_LOCAL_PATH}'
-VALID_FILE_FORMATS = ['csv', 'parquet']
-VALID_INGESTION_MODES = ['incremental', 'full_load']
-VALID_ENGINES = ['mysql+pymysql', 'postgresql+psycopg2']
-VALID_CLOUD_PROVIDERS = ['aws']
-UPLOAD_REMAINING_FILES = False
+CONFIG = json.loads(open('config.json').read())
+TMP_LOCAL_PATH = CONFIG.get('tmp_local_path', 'tmp')
+CONFIG_FILES_PATH = CONFIG.get('configs_path', 'configs')
+MAX_WORKERS = CONFIG.get('max_workers', 10)
+VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
+VALID_INGESTION_MODES = CONFIG.get('valid_values').get('ingestion_mode')
+VALID_ENGINES = CONFIG.get('valid_values').get('engine')
+VALID_CLOUD_PROVIDERS = CONFIG.get('valid_values').get('cloud_provider')
+UPLOAD_REMAINING_FILES = CONFIG.get('upload_remaining_files_to_cloud', True)
 
 class Main:
     
-    """
-    Main application class to orchestrate the data extraction process.
-    It loads configuration files, validates them, and starts the data extraction.
-    """
-    
     def __init__(
-        self
+        self,
+        **kwargs
     ) -> None:
+        
+        """
+        Main application class to orchestrate the data extraction process.
+        It loads configuration files, validates them, and starts the data extraction
+        """
 
         starting_time = datetime.datetime.now()
         
-        _log.info('Starting data extraction...')
-
-        snowflake_client = SnowflakeClient(stages_data_path=STAGE_ROOT_PATH)
+        _log.info('Starting data extraction for databases...')
         
         for config_file_path in self.get_config_files_paths(path=CONFIG_FILES_PATH):
-
+            
+            starting_extraction_time = datetime.datetime.now()
+            
             config_file_name = config_file_path.split('/')[-1]
             config = self.load_config_file(path=config_file_path)
-            cloud_config = config.pop('cloud', {})
-            database_connection_config = config.pop('database_connection', {})
-            extraction_file_config = config.pop('extraction_file', {})
-            tables_config = config.pop('tables', [])
-            
-            if self.__validate_if_cloud_config_is_invalid(
-                cloud_config=cloud_config, 
-                config_file_name=config_file_name
-            ): continue
-            cloud_client = CloudClient(**cloud_config)
             
             if self.__validate_if_config_is_disabled(
                 config=config, 
                 config_file_name=config_file_name
             ): continue
             
+            extraction_file_config = config.pop('extraction_file', {})
+            if self.__validate_if_extraction_file_config_is_invalid(
+                extraction_file_config=extraction_file_config, 
+                config_file_name=config_file_name
+            ): continue
+            file_service_client = FileServiceClient(tmp_local_directory=TMP_LOCAL_PATH,
+                                                    **extraction_file_config)
+            
+            database_connection_config = config.pop('database_connection', {})
             if self.__validate_if_database_connection_config_is_invalid(
                 database_connection_config=database_connection_config, 
                 config_file_name=config_file_name
@@ -68,13 +68,20 @@ class Main:
             except Exception as e:
                 _log.error(e)
                 continue
-
-            if self.__validate_if_extraction_file_config_is_invalid(
-                extraction_file_config=extraction_file_config, 
+            
+            cloud_config = config.pop('cloud', {})
+            if self.__validate_if_cloud_config_is_invalid(
+                cloud_config=cloud_config, 
                 config_file_name=config_file_name
             ): continue
-            file_service_client = FileServiceClient(**extraction_file_config)
+            cloud_client = CloudClient(**cloud_config)
+
+            snowflake_connection_config = config.pop('snowflake_connection', {})
+            snowflake_client = SnowflakeClient(file_service_client=file_service_client,
+                                               cloud_client=cloud_client, 
+                                               **snowflake_connection_config)
             
+            tables_config = config.pop('tables', [])
             filtered_tables_configs = []
             for table_config in tables_config:
                 
@@ -96,9 +103,15 @@ class Main:
                 tables_configs=filtered_tables_configs,
                 max_workers=MAX_WORKERS
             )
+            
+            ending_extraction_time = datetime.datetime.now()
+            
+            _log.info(f"Data extraction finished for '{config_file_name}'. "
+                      f"Total time taken: {starting_extraction_time - ending_extraction_time}")
+        
 
         ending_time = datetime.datetime.now()
-        _log.info(f"Data extraction finished! Total time taken: {ending_time - starting_time}")
+        _log.info(f"Extraction completed for all configs! Total time taken: {ending_time - starting_time}")
 
     def get_config_files_paths(
         self,

@@ -3,8 +3,14 @@ description: Postgres replication of sales and products data
 cloud:
   provider: aws
   s3_bucket: ct-carasso-poc
-extraction_file:
-  file_format: csv
+snowflake_connection:
+  account: sw_account
+  user: sw_user
+  password: sw_password
+  role: sw_role
+  warehouse: COMPUTE_WH
+  database: CARASSO_POC_DB
+  schema: POTSGRES
 database_connection:
   engine: postgresql+psycopg2
   host: localhost
@@ -13,6 +19,8 @@ database_connection:
   password: postgres_password
   database: postgres
   schema: public
+extraction_file:
+  file_format: csv
 tables:
   - table_name: customers
     ingestion_mode: full_load

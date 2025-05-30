@@ -11,8 +11,6 @@ load_dotenv()
 
 class DatabaseClient:
 
-    """Class to manage database connections and execute queries."""
-
     def __init__(
         self,
         engine: str,

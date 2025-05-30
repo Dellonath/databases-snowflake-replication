@@ -8,11 +8,9 @@ from ..logs.logger import _log
 
 class FileServiceClient:
 
-    """A class to handle writing data to files in different formats"""
-
     def __init__(
         self,
-        tmp_local_directory: str='tmp',
+        tmp_local_directory: str='data',
         file_format: str='parquet'
     ) -> None:
 
@@ -28,19 +26,19 @@ class FileServiceClient:
 
     def list_files_in_directory(
         self,
-        directory_path: str
+        path: str
     ) -> list[str]:
         
         """
         List all files in a directory
         
-        :param str directory_path: The path to the directory to search for files
+        :param str path: The path to the directory to search for files
         :return: A list of file paths matching the specified pattern
         """
 
-        pattern = f'{directory_path}/*'
+        pattern = f'{path}/*'
         files = glob.glob(pattern)
-        _log.info(f"Found {len(files)} files in '{directory_path}'")
+        _log.info(f"Found {len(files)} files in '{path}'")
         
         return files
 
@@ -85,11 +83,11 @@ class FileServiceClient:
 
         try:
             os.remove(file_path)
-            _log.info(f"File {file_path} deleted successfully.")
+            _log.info(f"File '{file_path}' deleted successfully")
         except OSError as e:
             _log.error(f"Error deleting file {file_path}: {e}")
         except FileNotFoundError:
-            _log.error(f"File {file_path} not found for deletion.")
+            _log.error(f"File {file_path} not found for deletion")
 
     def __write_csv(
         self,

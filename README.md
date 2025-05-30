@@ -5,7 +5,6 @@ Project to replicate databases into snowflake
 
 Information needed in .env:
 ```
-aws_s3_bucket = bucket name in s3
 aws_access_key_id = aws access key
 aws_secret_access_key = aws secret access key
 region = aws region

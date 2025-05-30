@@ -1,0 +1,14 @@
+{
+    "tmp_local_path": "data",
+    "configs_path": "configs",
+    "valid_values": {
+        "ingestion_mode": ["incremental", "full_load"],
+        "file_format": ["csv", "parquet"],
+        "engine": ["mysql+pymysql", "postgresql+psycopg2"],
+        "cloud_provider": ["aws"]
+    },
+    "tasks": {
+        "max_workers": 5
+    },
+    "upload_remaining_files_to_cloud": false
+}

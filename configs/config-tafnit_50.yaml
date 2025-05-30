@@ -1,29 +1,35 @@
 config_enabled: true
-description: TAFNIT 116 Replication Configuration
+description: TAFNIT 50 Replication Configuration
 cloud:
   provider: aws
   s3_bucket: ct-carasso-poc
-extraction_file:
-  file_format: parquet
+snowflake_connection:
+  account: sw_account
+  user: sw_user
+  password: sw_password
+  role: sw_role
+  warehouse: COMPUTE_WH
+  database: CARASSO_POC_DB
+  schema: TAFNIT_50
 database_connection:
   engine: mysql+pymysql
   host: localhost
   port: 3307
   username: root
   password: mysql_password
-  database: tafnit_116
+  database: tafnit_50
+extraction_file:
+  file_format: csv
 tables:
   - table_name: users
     ingestion_mode: full_load
   - table_name: products
     ingestion_mode: full_load
-  - table_name: orders
+  - table_name: orders 
     ingestion_mode: full_load
   - table_name: categories
     ingestion_mode: full_load
   - table_name: reviews
     ingestion_mode: full_load
-  - table_name: product_categories
-    ingestion_mode: full_load
-  - table_name: product_categories_missing
+  - table_name: product_category_links
     ingestion_mode: full_load

@@ -1,6 +1,8 @@
 import os
 import snowflake.connector
 from dotenv import load_dotenv
+from .cloud_client import AWSCloudClient, GCPCloudClient
+from .file_service_client import FileServiceClient
 from ..logs.logger import _log
 
 load_dotenv()
@@ -8,27 +10,42 @@ load_dotenv()
 class SnowflakeClient:
 
     """
-    Class to manage connections and execute queries on a Snowflake database.
-    This class uses environment variables for configuration and provides methods to execute SQL queries.
-    Attributes:
-        __connection (snowflake.connector): The Snowflake connection object.
+    Class to manage connections and execute queries on a Snowflake database
     """
     
     def __init__(
-        self, 
-        database: str='CARASSO_POC_DB', 
-        stages_data_path: str = None
+        self,
+        account: str,
+        user: str,
+        password: str,
+        role: str,
+        warehouse: str,
+        database: str,
+        schema: str,
+        file_service_client: FileServiceClient,
+        cloud_client: AWSCloudClient | GCPCloudClient
     ) -> None:
         
         """
         Initialize the SnowflakeClient and establish a connection to the Snowflake database.
-        This constructor reads the connection parameters from environment variables.
+        This constructor reads the connection parameters from environment variables
         """
         
-        self.__connection = self.__connect_to_snowflake()
-        self.__sf_database = database.upper()
-        self.__stages_data_path = stages_data_path
+        self.__account = os.getenv(account)
+        self.__user = os.getenv(user)
+        self.__password = os.getenv(password)
+        self.__role = os.getenv(role)
+        self.__warehouse = warehouse.upper()
+        self.__database = database.upper()
+        self.__schema = schema.upper()
+        
+        if cloud_client.cloud_name == 'aws':
+            self.__stages_data_path = f's3://{cloud_client.s3_bucket}/{file_service_client.tmp_local_directory}'
+        elif cloud_client.cloud_name == 'gcp':
+            self.__stages_data_path = f'gs://{cloud_client.cloud_storage_name}/{file_service_client.tmp_local_directory}'
 
+        self.__connection = self.__connect_to_snowflake()
+        
     def execute_query(
         self, 
         query
@@ -62,9 +79,9 @@ class SnowflakeClient:
         table_upper = table.upper()
         file_format_upper = file_format.upper()
         
-        self.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.__sf_database};")
-        self.execute_query(f"CREATE SCHEMA IF NOT EXISTS {self.__sf_database}.{schema_upper};")
-        self.execute_query(f"USE {self.__sf_database}.{schema_upper};")
+        self.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.__database};")
+        self.execute_query(f"CREATE SCHEMA IF NOT EXISTS {self.__database}.{schema_upper};")
+        self.execute_query(f"USE {self.__database}.{schema_upper};")
         
         self.execute_query(f"""
             CREATE OR REPLACE FILE FORMAT CARASSO_PARQUET_SCHEMA_EVOLUTION
@@ -115,13 +132,13 @@ class SnowflakeClient:
         
         try:
             connection = snowflake.connector.connect(
-                role=os.getenv('sw_role'),
-                user=os.getenv('sw_user'),
-                password=os.getenv('sw_password'),
-                account=os.getenv('sw_account'),
-                warehouse=os.getenv('sw_warehouse'),
-                database=os.getenv('sw_database'),
-                schema=os.getenv('sw_schema')
+                account=self.__account,
+                user=self.__user,
+                password=self.__password,
+                role=self.__role,
+                warehouse=self.__warehouse,
+                database=self.__database,
+                schema=self.__schema
             )
         except Exception as e:
             _log.error(f"Failed to connect to Snowflake: {e}")
