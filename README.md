@@ -14,7 +14,4 @@ sw_user = snowflake user
 sw_role = snowflake role
 sw_password = snowflakse user password
 sw_account = snowflake account
-sw_warehouse = snowflake warehouse
-sw_database = snowflake database
-sw_schema = snowflake schema
 ```
