@@ -2,7 +2,8 @@ config_enabled: true
 description: TAFNIT 116 Replication Configuration
 cloud:
   provider: aws
-  s3_bucket: ct-carasso-poc
+  bucket: ct-carasso-poc
+  cloud_storage_directory: cloud/tmp
 snowflake_connection:
   account: sw_account
   user: sw_user
@@ -19,7 +20,7 @@ database_connection:
   password: mysql_password
   database: tafnit_116
 extraction_file:
-  local_storage_directory: tmp/data
+  local_storage_directory: tmp/data/
   file_format: parquet
   exclude_file_after_uploading: true
   upload_remaining_files: true
