@@ -20,6 +20,7 @@ database_connection:
   database: postgres
   schema: public
 extraction_file:
+  local_storage_directory: tmp/data
   file_format: csv
   exclude_file_after_uploading: true
   upload_remaining_files: true

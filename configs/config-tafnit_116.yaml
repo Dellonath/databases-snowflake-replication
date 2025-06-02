@@ -19,6 +19,7 @@ database_connection:
   password: mysql_password
   database: tafnit_116
 extraction_file:
+  local_storage_directory: tmp/data
   file_format: parquet
   exclude_file_after_uploading: true
   upload_remaining_files: true

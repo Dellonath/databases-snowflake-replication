@@ -1,5 +1,4 @@
 {
-    "tmp_local_path": "data",
     "configs_path": "configs",
     "valid_values": {
         "ingestion_mode": ["incremental", "full_load"],

@@ -55,8 +55,7 @@ class Main:
                 extraction_file_config=extraction_file_config, 
                 config_file_name=config_file_name
             ): continue
-            file_service_client = FileServiceClient(tmp_local_directory=TMP_LOCAL_PATH,
-                                                    **extraction_file_config)
+            file_service_client = FileServiceClient(**extraction_file_config)
             
             database_connection_config = config.pop('database_connection', {})
             if self.__validate_if_database_connection_config_is_invalid(

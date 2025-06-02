@@ -7,7 +7,7 @@ class CloudClient:
     """
     Factory class to create and return a cloud client instance based on the specified cloud provider.
     Usage:
-        client = CloudClient(cloud_name='aws', bucket_name='my-bucket')
+        client = CloudClient(provider='aws', bucket_name='my-bucket')
     """
 
     def __new__(cls, provider: str, **kwargs):
