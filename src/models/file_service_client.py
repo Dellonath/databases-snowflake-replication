@@ -10,7 +10,7 @@ class FileServiceClient:
 
     def __init__(
         self,
-        tmp_local_directory: str='data',
+        local_storage_directory: str='',
         file_format: str='parquet',
         exclude_file_after_uploading: bool=True,
         upload_remaining_files: bool=True
@@ -19,13 +19,13 @@ class FileServiceClient:
         """
         A class to handle writing data to files in different formats
         
-        :param str tmp_local_directory (optional): The root local directory where files will be saved temporarily
+        :param str local_storage_directory (optional): The local storage directory where files will be saved temporarily
         :param str file_format (optional): The format of the output files ('csv' or 'parquet')
         :param bool exclude_file_after_uploading (optional): allow excluding files after uploading it to cloud
         :param bool upload_remaining_files (optional): Flag to allow uploading all remaining files stored in local machine
         """
 
-        self.tmp_local_directory = tmp_local_directory
+        self.local_storage_directory = local_storage_directory
         self.file_format = file_format
         self.exclude_file_after_uploading = exclude_file_after_uploading
         self.upload_remaining_files = upload_remaining_files
@@ -43,14 +43,14 @@ class FileServiceClient:
         """
 
         pattern = f'{path}/*'
-        files = glob.glob(pattern)
-        _log.info(f"Found {len(files)} files in '{path}'")
+        files = [file_path.split('/')[-1] for file_path in glob.glob(pattern)]
         
         return files
 
     def write_file(
         self,
-        file_path: str,
+        local_storage_path: str,
+        file_name: str,
         table_data: list,
         table_columns: list[str]
     ) -> None:
@@ -58,42 +58,45 @@ class FileServiceClient:
         """
         Write data to a file in the specified format
         
-        :param str file_path: The full file output path
-        :param list table_data: The data to write
-        :param list[str] table_columns: The table columns names
+        :param str local_storage_table_path: The local storage where table should be loaded
+        :param str file_name: The output file name
+        :param list table_data: The data content to write
+        :param list[str] table_columns: The source table columns names
         """
+        
+        # creating table directory if it does not exist in local 
+        os.makedirs(name=local_storage_path, exist_ok=True)
 
-        # creating table directory if it does not exist in local storage
-        os.makedirs(name=os.path.dirname(file_path), exist_ok=True)
+        file_path = f'{local_storage_path}/{file_name}'
+        _log.info(f"Writing {self.file_format} file to path: '{file_path}'")
 
-        _log.info(f"Writing data to path: '{file_path}'")
         if self.file_format == 'parquet':
             self.__write_parquet(file_path=file_path,
-                                table_data=table_data,
-                                table_columns=table_columns)
+                                 table_data=table_data,
+                                 table_columns=table_columns)
         elif self.file_format == 'csv':
             self.__write_csv(file_path=file_path,
-                            table_data=table_data,
-                            table_columns=table_columns)
+                             table_data=table_data,
+                             table_columns=table_columns)
 
     def delete_file(
         self,
-        file_path: str
+        path: str
     ) -> None:
 
         """
-        Delete a file
+        Delete a file or directory
         
-        :param str file_path: The path to the file to delete.
+        :param str path: The local file/directory to be deleted
         """
 
         try:
-            os.remove(file_path)
-            _log.info(f"File '{file_path}' deleted successfully")
+            os.remove(path)
+            _log.info(f"Direcory/File '{path}' deleted successfully")
         except OSError as e:
-            _log.error(f"Error deleting file {file_path}: {e}")
+            _log.error(e)
         except FileNotFoundError:
-            _log.error(f"File {file_path} not found for deletion")
+            _log.error(e)
 
     def __write_csv(
         self,

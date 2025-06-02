@@ -94,34 +94,41 @@ class TaskManagerClient:
         table_columns = self.__database_client.tables_columns[table_name]
 
         # setting the temp directory path to store the files in a temporary location
-        file_directory_path = (
-            f'{self.__file_service_client.tmp_local_directory}/'
+        local_storage_path = (
+            f'{self.__file_service_client.local_storage_directory}'
             f'{database}/'
             f'{table_name}'
         )
-
-        # defining the full qualified file path in the temporary location
-        timestamp = datetime.datetime.now().strftime(format='%Y%m%d%H%M%S')
-        file_path = (
-            f'{file_directory_path}/'
-            f'{timestamp}.{self.__file_service_client.file_format}'
+        
+        cloud_storage_path = (
+            f'{self.__cloud_client.cloud_storage_directory}'
+            f'{database}/'
+            f'{table_name}'
         )
-
-        self.__file_service_client.write_file(file_path=file_path,
+        
+        # defining the file name
+        timestamp = datetime.datetime.now().strftime(format='%Y%m%d%H%M%S')
+        file_name = f'{timestamp}.{self.__file_service_client.file_format}'
+        
+        self.__file_service_client.write_file(local_storage_path=local_storage_path,
+                                              file_name=file_name,
                                               table_data=data,
                                               table_columns=table_columns)
-
+        
         # uploading file to cloud storage and deleting (or not) after completion
-        self.__upload_and_delete_file(file_path=file_path)
-
+        self.__upload_and_delete_file(local_storage_path=local_storage_path,
+                                      cloud_storage_path=cloud_storage_path,
+                                      file_name=file_name)
+        
         # uploading remaining files wheter the flag is set as true
         if self.__file_service_client.upload_remaining_files:
-            self.__upload_remaining_files(files_directory_path=file_directory_path)
+            self.__upload_remaining_files(local_storage_path=local_storage_path,
+                                          cloud_storage_path=cloud_storage_path)
 
         # uploading data to Snowflake
         _log.info(f"Setting up and ingesting data table '{database}.{table_name}' into Snowflake")
-        self.__snowflake_client.setup_table_in_snowflake(stage_path=file_directory_path,
-                                                         table=table_name)
+        self.__snowflake_client.setup_table_in_snowflake(cloud_storage_path=cloud_storage_path,
+                                                         table_name=table_name)
 
         task_ending_time = datetime.datetime.now()
 
@@ -130,30 +137,31 @@ class TaskManagerClient:
 
     def __upload_and_delete_file(
         self,
-        file_path: str
+        local_storage_path: str,
+        cloud_storage_path: str,
+        file_name: str
     ) -> None:
-        
-        status = self.__cloud_client.upload_file(file_path=file_path)
+
+        status = self.__cloud_client.upload_file(local_storage_path=local_storage_path,
+                                                 cloud_storage_path=cloud_storage_path,
+                                                 file_name=file_name)
         if status and self.__file_service_client.exclude_file_after_uploading:
-            self.__file_service_client.delete_file(file_path=file_path)
-    
+            self.__file_service_client.delete_file(path=f'{local_storage_path}/{file_name}')
+
     def __upload_remaining_files(
         self,
-        files_directory_path: str
+        local_storage_path: str,
+        cloud_storage_path: str
     ) -> None:
-
-        """
-        A utility function to upload to cloud all remaining files stored in local machine
-        
-        :param str files_directory_path: The path fot the remaining table files
-        """
-
-        remaining_files_paths = self.__file_service_client.list_files_in_directory(
-            path=files_directory_path
+    
+        remaining_files = self.__file_service_client.list_files_in_directory(
+            path=local_storage_path
         )
-        for remaining_file_path in remaining_files_paths:
-            _log.info(f"Uploading remaining file: '{remaining_file_path}'")
-            self.__upload_and_delete_file(file_path=remaining_file_path)
+        for remaining_file in remaining_files:
+            _log.info(f"Uploading remaining file: '{local_storage_path}/{remaining_file}'")
+            self.__upload_and_delete_file(local_storage_path=local_storage_path,
+                                          cloud_storage_path=cloud_storage_path,
+                                          file_name=remaining_file)
 
     def start_replication(
         self,

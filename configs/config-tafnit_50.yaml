@@ -3,7 +3,6 @@ description: TAFNIT 50 Replication Configuration
 cloud:
   provider: aws
   bucket: ct-carasso-poc
-  cloud_storage_directory: cloud/tmp
 snowflake_connection:
   account: sw_account
   user: sw_user
@@ -20,7 +19,7 @@ database_connection:
   password: mysql_password
   database: tafnit_50
 extraction_file:
-  local_storage_directory: tmp/data/
+  local_storage_directory: tmp/
   file_format: csv
   exclude_file_after_uploading: true
   upload_remaining_files: true

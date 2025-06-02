@@ -5,6 +5,8 @@ class GCPCloudClient:
   
     def __init__(
             self,
+            bucket: str,
+            cloud_storage_directory: str='',
             **kwargs
         ) -> None:
         
@@ -13,18 +15,20 @@ class GCPCloudClient:
         self.cloud_name = 'gcp'
         self.cloud_storage_name = 'cloud_storage'
         self.cloud_storage_prefix = 'gs://'
+        self.cloud_storage_directory = cloud_storage_directory
+        self.bucket = bucket
         
     def upload_file(
-            self, 
-            file_path: str,
-            file_path_cloud: str = None
-        ) -> bool:
+        self, 
+        local_storage_path: str,
+        file_name: str
+    ) -> bool:
       
         """
         Upload a file to an S3 bucket
         
-        :param str file_path: The local path to the file to upload
-        :param str file_path_cloud: The path in the GCP Cloud Storage where the file will be uploaded
+        :param str local_storage_path: The local storage location
+        :param str file_name: The path local file name
         """
         
         # Placeholder for actual GCP upload logic
