@@ -177,7 +177,7 @@ class SnowflakeClient:
     ) -> snowflake.connector:
         
         """
-        Establish a connection to the Snowflake database using environment variables.
+        Establish a connection to the Snowflake database using environment variables
         """
         
         try:
@@ -193,7 +193,7 @@ class SnowflakeClient:
         except Exception as e:
             _log.error(f"Failed to connect to Snowflake: {e}")
             raise e
-        _log.info("Connected to Snowflake successfully.")
+        _log.info("Connected to Snowflake successfully")
         
         return connection
     
@@ -201,11 +201,11 @@ class SnowflakeClient:
         self
     ) -> None:
         
-        """Destructor to close the Snowflake connection."""
+        """Destructor to close the Snowflake connection"""
         
         if self.__connection:
             try:
                 self.__connection.close()
-                _log.info("Snowflake connection closed successfully.")
+                _log.info("Snowflake connection closed successfully")
             except Exception as e:
                 _log.error(f"Error closing Snowflake connection: {e}")
