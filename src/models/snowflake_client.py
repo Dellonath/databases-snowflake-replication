@@ -29,6 +29,16 @@ class SnowflakeClient:
         """
         Initialize the SnowflakeClient and establish a connection to the Snowflake database.
         This constructor reads the connection parameters from environment variables
+        
+        :param str account: Snowflake's account
+        :param str user: Snowflake's username
+        :param str password: User password
+        :param str role: Role to be assumed during connection
+        :param str warehouse: Snowflake's warehouse to be used to execute queries
+        :param str database: Snowflake's database
+        :param str schema: The database's schema name
+        :param FileServiceClient file_service_client: File service client to manipulate data files
+        :param AWSCloudClient | GCPCloudClient cloud_client: The cloud interface client
         """
         
         self.__account = os.getenv(account)
@@ -39,13 +49,17 @@ class SnowflakeClient:
         self.__database = database.upper()
         self.__schema = schema.upper()
         
-        if cloud_client.cloud_name == 'aws':
-            self.__stages_data_path = f's3://{cloud_client.s3_bucket}/{file_service_client.tmp_local_directory}'
-        elif cloud_client.cloud_name == 'gcp':
-            self.__stages_data_path = f'gs://{cloud_client.cloud_storage_name}/{file_service_client.tmp_local_directory}'
+        self.__cloud_client = cloud_client
+        self.__file_service_client = file_service_client
+        
+        # snowflake;s ingestion configurations
+        self.__storage_integration = 'CT_CARASSO_AWS'
+        self.__snowflake_file_format = (
+            f'CARASSO_{self.__file_service_client.file_format.upper()}_SCHEMA_EVOLUTION'
+        )
 
         self.__connection = self.__connect_to_snowflake()
-        
+
     def execute_query(
         self, 
         query
@@ -68,60 +82,93 @@ class SnowflakeClient:
             _log.error(f"Error executing query '{query}' in Snowflake: {e}")
             return []
     
-    def setup_snowflake_stage_schema_table(
-        self, 
-        schema: str,
-        table: str,
-        file_format: str
+    def setup_table_in_snowflake(
+        self,
+        stage_path: str,
+        table: str
     ) -> None:
         
-        schema_upper = schema.upper()
-        table_upper = table.upper()
-        file_format_upper = file_format.upper()
-        
-        self.execute_query(f"CREATE DATABASE IF NOT EXISTS {self.__database};")
-        self.execute_query(f"CREATE SCHEMA IF NOT EXISTS {self.__database}.{schema_upper};")
-        self.execute_query(f"USE {self.__database}.{schema_upper};")
+        # creating snowflake's database and schema if not exists and using it
+        self.__setup_database_and_schema()
+        # defining file formats able to deal with schema evolution
+        self.__setup_snowflake_file_formats()
+        # creating exernal stage pointing to files in the external cloud provider
+        self.__create_snowflake_stage(stage_path=stage_path, 
+                                      table_name=table)
+        # creating snowflake table using infer schema and schema evolution enabled
+        self.__create_snowflake_table(table_name=table)
+        # copying data into the new created table
+        self.__execute_copy_command(table_name=table)
+    
+    def __execute_copy_command(
+        self,
+        table_name: str
+    ) -> None:
         
         self.execute_query(f"""
-            CREATE OR REPLACE FILE FORMAT CARASSO_PARQUET_SCHEMA_EVOLUTION
-            TYPE='PARQUET';
+            COPY INTO {self.__database}.{self.__schema}.{table_name.upper()}
+                FROM @stage_{table_name}
+                MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE
+                FILE_FORMAT={self.__snowflake_file_format};
         """)
         
-        self.execute_query(f"""
-            CREATE OR REPLACE FILE FORMAT CARASSO_CSV_SCHEMA_EVOLUTION
-            TYPE='CSV'
-            FIELD_DELIMITER='|'
-            PARSE_HEADER=true
-            ERROR_ON_COLUMN_COUNT_MISMATCH=false;
-        """)
- 
-        self.execute_query(f"""
-            CREATE STAGE IF NOT EXISTS stage_{table}
-                STORAGE_INTEGRATION=CT_CARASSO_AWS
-                URL='{self.__stages_data_path}/{schema}/{table}/'
-                FILE_FORMAT=CARASSO_{file_format_upper}_SCHEMA_EVOLUTION;
-        """)
+    def __create_snowflake_table(
+        self,
+        table_name: str
+    ) -> None:
         
         self.execute_query(f"""
-            CREATE TABLE IF NOT EXISTS {table_upper}
+            CREATE TABLE IF NOT EXISTS {self.__database}.{self.__schema}.{table_name.upper()}
             USING TEMPLATE (
                 SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*))
                 FROM TABLE(
                     INFER_SCHEMA(
-                        LOCATION=>'@stage_{table}',
-                        FILE_FORMAT=>'CARASSO_{file_format_upper}_SCHEMA_EVOLUTION'
+                        LOCATION=>'@stage_{table_name}',
+                        FILE_FORMAT=>'{self.__snowflake_file_format}'
                     )
                 )) ENABLE_SCHEMA_EVOLUTION=true;
         """)
-        
+    
+    def __create_snowflake_stage(
+        self,
+        stage_path: str,
+        table_name: str
+    ) -> None:
+
+        stage_path = f'{self.__cloud_client.cloud_storage_prefix}{self.__cloud_client.bucket}/{stage_path}'
+
         self.execute_query(f"""
-            COPY INTO {table_upper}
-                FROM @stage_{table}
-                MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE
-                FILE_FORMAT = CARASSO_{file_format_upper}_SCHEMA_EVOLUTION;
+            CREATE STAGE IF NOT EXISTS stage_{table_name}
+                STORAGE_INTEGRATION={self.__storage_integration}
+                URL='{stage_path}'
+                FILE_FORMAT={self.__snowflake_file_format};
         """)
     
+    def __setup_database_and_schema(
+        self
+    ) -> None:
+        
+        self.execute_query(f'CREATE DATABASE IF NOT EXISTS {self.__database}')
+        self.execute_query(f'CREATE SCHEMA IF NOT EXISTS {self.__database}.{self.__schema}')
+        
+    def __setup_snowflake_file_formats(
+        self
+    ) -> None:
+        
+        if self.__file_service_client.file_format.lower() == 'parquet':
+            self.execute_query(f"""
+                CREATE FILE FORMAT IF NOT EXISTS {self.__database}.{self.__schema}.{self.__snowflake_file_format}
+                TYPE='PARQUET';
+            """)
+        elif self.__file_service_client.file_format.lower() == 'csv':
+            self.execute_query(f"""
+                CREATE FILE FORMAT IF NOT EXISTS {self.__database}.{self.__schema}.{self.__snowflake_file_format}
+                TYPE='CSV'
+                FIELD_DELIMITER='|'
+                PARSE_HEADER=true
+                ERROR_ON_COLUMN_COUNT_MISMATCH=false;
+            """)
+
     def __connect_to_snowflake(
         self
     ) -> snowflake.connector:

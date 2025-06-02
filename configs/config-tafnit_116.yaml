@@ -20,6 +20,8 @@ database_connection:
   database: tafnit_116
 extraction_file:
   file_format: parquet
+  exclude_file_after_uploading: true
+  upload_remaining_files: true
 tables:
   - table_name: users
     ingestion_mode: full_load

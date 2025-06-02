@@ -11,7 +11,9 @@ class FileServiceClient:
     def __init__(
         self,
         tmp_local_directory: str='data',
-        file_format: str='parquet'
+        file_format: str='parquet',
+        exclude_file_after_uploading: bool=True,
+        upload_remaining_files: bool=True
     ) -> None:
 
         """
@@ -19,10 +21,14 @@ class FileServiceClient:
         
         :param str tmp_local_directory (optional): The root local directory where files will be saved temporarily
         :param str file_format (optional): The format of the output files ('csv' or 'parquet')
+        :param bool exclude_file_after_uploading (optional): allow excluding files after uploading it to cloud
+        :param bool upload_remaining_files (optional): Flag to allow uploading all remaining files stored in local machine
         """
 
         self.tmp_local_directory = tmp_local_directory
         self.file_format = file_format
+        self.exclude_file_after_uploading = exclude_file_after_uploading
+        self.upload_remaining_files = upload_remaining_files
 
     def list_files_in_directory(
         self,

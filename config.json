@@ -9,6 +9,5 @@
     },
     "tasks": {
         "max_workers": 5
-    },
-    "upload_remaining_files_to_cloud": false
+    }
 }

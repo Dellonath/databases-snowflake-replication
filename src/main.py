@@ -97,8 +97,7 @@ class Main:
                 database_client=database_client,
                 file_service_client=file_service_client,
                 cloud_client=cloud_client,
-                snowflake_client=snowflake_client,
-                upload_remaining_files=UPLOAD_REMAINING_FILES
+                snowflake_client=snowflake_client
             ).start_replication(
                 tables_configs=filtered_tables_configs,
                 max_workers=MAX_WORKERS
@@ -107,7 +106,7 @@ class Main:
             ending_extraction_time = datetime.datetime.now()
             
             _log.info(f"Data extraction finished for '{config_file_name}'. "
-                      f"Total time taken: {starting_extraction_time - ending_extraction_time}")
+                      f"Total time taken: {ending_extraction_time - starting_extraction_time}")
         
 
         ending_time = datetime.datetime.now()

@@ -18,10 +18,11 @@ class AWSCloudClient:
         
         self.cloud_name = 'aws'
         self.cloud_storage_name = 's3'
+        self.cloud_storage_prefix = 's3://'
         self.__aws_access_key_id = os.getenv('aws_access_key_id')
         self.__aws_secret_access_key = os.getenv('aws_secret_access_key')
         self.__region = os.getenv('region')
-        self.s3_bucket = s3_bucket
+        self.bucket = s3_bucket
         
         self.__storage_client = boto3.client(
             self.cloud_storage_name,
@@ -50,7 +51,7 @@ class AWSCloudClient:
         _log.info(f"Uploading file '{file_path}' into S3")
         try:
             self.__storage_client.upload_file(Filename=file_path,
-                                              Bucket=self.s3_bucket, 
+                                              Bucket=self.bucket, 
                                               Key=file_path_cloud)
             _log.info(f"File '{file_path}' uploaded to S3 successfully")
             

@@ -12,6 +12,7 @@ class GCPCloudClient:
         
         self.cloud_name = 'gcp'
         self.cloud_storage_name = 'cloud_storage'
+        self.cloud_storage_prefix = 'gs://'
         
     def upload_file(
             self, 

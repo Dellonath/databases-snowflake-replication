@@ -10,7 +10,7 @@ snowflake_connection:
   role: sw_role
   warehouse: COMPUTE_WH
   database: CARASSO_POC_DB
-  schema: POTSGRES
+  schema: POSTGRES
 database_connection:
   engine: postgresql+psycopg2
   host: localhost
@@ -21,6 +21,8 @@ database_connection:
   schema: public
 extraction_file:
   file_format: csv
+  exclude_file_after_uploading: true
+  upload_remaining_files: true
 tables:
   - table_name: customers
     ingestion_mode: full_load
