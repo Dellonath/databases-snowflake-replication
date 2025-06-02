@@ -85,7 +85,7 @@ class SnowflakeClient:
     def setup_table_in_snowflake(
         self,
         stage_path: str,
-        table: str
+        table_name: str
     ) -> None:
         
         # creating snowflake's database and schema if not exists and using it
@@ -93,12 +93,11 @@ class SnowflakeClient:
         # defining file formats able to deal with schema evolution
         self.__setup_snowflake_file_formats()
         # creating exernal stage pointing to files in the external cloud provider
-        self.__create_snowflake_stage(stage_path=stage_path, 
-                                      table_name=table)
+        self.__create_snowflake_stage(stage_name=table_name)
         # creating snowflake table using infer schema and schema evolution enabled
-        self.__create_snowflake_table(table_name=table)
+        self.__create_snowflake_table(table_name=table_name)
         # copying data into the new created table
-        self.__execute_copy_command(table_name=table)
+        self.__execute_copy_command(table_name=table_name)
     
     def __execute_copy_command(
         self,
@@ -131,14 +130,13 @@ class SnowflakeClient:
     
     def __create_snowflake_stage(
         self,
-        stage_path: str,
-        table_name: str
+        stage_name: str
     ) -> None:
 
         stage_path = f'{self.__cloud_client.cloud_storage_prefix}{self.__cloud_client.bucket}/{stage_path}'
 
         self.execute_query(f"""
-            CREATE STAGE IF NOT EXISTS stage_{table_name}
+            CREATE STAGE IF NOT EXISTS stage_{stage_name}
                 STORAGE_INTEGRATION={self.__storage_integration}
                 URL='{stage_path}'
                 FILE_FORMAT={self.__snowflake_file_format};
