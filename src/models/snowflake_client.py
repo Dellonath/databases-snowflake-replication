@@ -191,9 +191,9 @@ class SnowflakeClient:
                 schema=self.__schema
             )
         except Exception as e:
-            _log.error(f"Failed to connect to Snowflake: {e}")
+            _log.error(f'Failed to connect to Snowflake: {e}')
             raise e
-        _log.info("Connected to Snowflake successfully")
+        _log.info('Connected to Snowflake successfully')
 
         return connection
 
@@ -206,6 +206,6 @@ class SnowflakeClient:
         if self.__connection:
             try:
                 self.__connection.close()
-                _log.info("Snowflake connection closed successfully")
+                _log.info('Snowflake connection closed successfully')
             except Exception as e:
-                _log.error(f"Error closing Snowflake connection: {e}")
+                _log.error(f'Error closing Snowflake connection: {e}')

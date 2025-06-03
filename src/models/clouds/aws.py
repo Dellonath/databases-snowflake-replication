@@ -32,7 +32,7 @@ class AWSCloudClient:
         )
 
     def upload_file(
-        self, 
+        self,
         local_storage_path: str,
         cloud_storage_path: str,
         file_name: str
@@ -46,21 +46,23 @@ class AWSCloudClient:
         :param str file_name: The path local file name
         """
 
-        _log.info(f"Uploading file '{local_storage_path}' into S3")
         datetime_now = datetime.datetime.now()
         partition_name = (
             f'year={datetime_now.year}/'
             f'month={datetime_now.month}/'
             f'day={datetime_now.day}'
         )
-        try:
-            local_storage_file_path = f'{local_storage_path}/{file_name}'
-            cloud_storage_file_path = f'{cloud_storage_path}/{partition_name}/{file_name}'
 
+        local_storage_file_path = f'{local_storage_path}/{file_name}'
+        cloud_storage_file_path = f'{cloud_storage_path}/{partition_name}/{file_name}'
+
+        _log.info(f"Uploading file '{local_storage_file_path}' to S3 in '{cloud_storage_file_path}'")
+
+        try:
             self.__storage_client.upload_file(Filename=local_storage_file_path,
                                               Bucket=self.bucket, 
                                               Key=cloud_storage_file_path)
-            _log.info(f"File '{local_storage_path}' uploaded to S3 successfully")
+            _log.info(f"File '{local_storage_file_path}' uploaded to S3 successfully")
 
             return True
         except FileNotFoundError as e:

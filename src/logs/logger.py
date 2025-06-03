@@ -4,7 +4,7 @@ import os
 
 os.makedirs(name='logs', exist_ok=True)
 
-timestamp = datetime.datetime.now(tz='UTC').strftime(format="%Y%m%d%H%M%S")
+timestamp = datetime.datetime.now().strftime(format="%Y%m%d%H%M%S")
 logging.basicConfig(filename=f'logs/extraction_{timestamp}.log', 
                     format='%(asctime)s %(levelname)s %(message)s',
                     filemode='a',

@@ -13,7 +13,6 @@ from .logs.logger import _log
 load_dotenv()
 
 CONFIG = json.loads(open('config.json').read())
-TMP_LOCAL_PATH = CONFIG.get('tmp_local_path', 'tmp')
 CONFIG_FILES_PATH = CONFIG.get('configs_path', 'configs')
 MAX_WORKERS = CONFIG.get('max_workers', 10)
 VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
@@ -106,11 +105,10 @@ class Main:
             ending_extraction_time = datetime.datetime.now()
 
             _log.info(f"Data extraction finished for '{config_file_name}'. "
-                      f"Total time taken: {ending_extraction_time - starting_extraction_time}")
-
+                      f'Total time taken: {ending_extraction_time - starting_extraction_time}')
 
         ending_time = datetime.datetime.now()
-        _log.info(f"Extraction completed for all configs! Total time taken: {ending_time - starting_time}")
+        _log.info(f'Extraction completed for all configs! Total time taken: {ending_time - starting_time}')
 
     def get_config_files_paths(
         self,
@@ -178,7 +176,7 @@ class Main:
         config_file_format = extraction_file_config.get('file_format', 'csv').lower()
         if config_file_format not in VALID_FILE_FORMATS:
             _log.error(f"Invalid file format defined in '{config_file_name}'. "
-                       f"Expected one of {VALID_FILE_FORMATS}")
+                       f'Expected one of {VALID_FILE_FORMATS}')
             return True
 
     def __validate_if_database_connection_config_is_invalid(
@@ -189,13 +187,13 @@ class Main:
         
         if not database_connection_config:
             _log.error(f"No database connection parameters defined in '{config_file_name}'. "
-                    "Skipping replication...")
+                        'Skipping replication...')
             return True
 
         config_db_engine = database_connection_config.get('engine').lower()
         if not config_db_engine or config_db_engine not in VALID_ENGINES:
             _log.error(f"Invalid database engine '{config_db_engine}' defined in '{config_file_name}'. "
-                    f"Expected one of {VALID_ENGINES}")
+                       f'Expected one of {VALID_ENGINES}')
             return True
 
         config_db_host = database_connection_config.get('host')
@@ -209,14 +207,14 @@ class Main:
                     config_db_password,
                     config_db_database]):
             _log.error(f"Database parameters connection missing for '{config_file_name}'. "
-                        "Check if required host, port, username, password and database are set")
+                        'Check if required host, port, username, password and database are set')
 
             return True
         
         config_db_schema = database_connection_config.get('schema')
         if not config_db_schema:
             _log.warning(f"No schema name defined in '{config_file_name}'. "
-                        f"Schema is using database name '{config_db_database}' by default")
+                         f"Schema is using database name '{config_db_database}' by default")
 
     def __validate_if_table_config_is_invalid(
         self,
@@ -244,17 +242,17 @@ class Main:
 
         if table_name not in source_db_tables:
             _log.error(f"Table '{table_name}' defined in '{config_file_name}' " 
-                        "does not exist in the source database. Skipping table...")
+                        'does not exist in the source database. Skipping table...')
             return True
 
         ingestion_mode = table_config.get('ingestion_mode')
         if ingestion_mode not in VALID_INGESTION_MODES:
             _log.error(f"Invalid ingestion mode '{ingestion_mode}' defined in '{config_file_name}': " 
-                        f"Expected one of {VALID_INGESTION_MODES}. Skipping table...")
+                        f'Expected one of {VALID_INGESTION_MODES}. Skipping table...')
             return True
 
         incremental_key = table_config.get('incremental_column')
         if ingestion_mode == 'incremental' and not incremental_key:
             _log.error(f"No incremental key defined for '{table_name}' in '{config_file_name}'. " 
-                        f"Skipping table...")
+                        f'Skipping table...')
             return True

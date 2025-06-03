@@ -133,7 +133,7 @@ class TaskManagerClient:
         task_ending_time = datetime.datetime.now()
 
         _log.info(f"Task completed for table '{database}.{table_name}'." 
-                  f"Total time taken: {task_ending_time - task_starting_time}")
+                  f'Total time taken: {task_ending_time - task_starting_time}')
 
     def __upload_and_delete_file(
         self,
