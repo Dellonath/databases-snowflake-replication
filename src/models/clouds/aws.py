@@ -3,6 +3,7 @@ import boto3
 from boto3.exceptions import S3UploadFailedError
 from ...logs.logger import _log
 
+
 class AWSCloudClient:
   
     def __init__(

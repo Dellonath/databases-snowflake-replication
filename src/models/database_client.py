@@ -9,6 +9,7 @@ from ..logs.logger import _log
 
 load_dotenv()
 
+
 class DatabaseClient:
 
     def __init__(

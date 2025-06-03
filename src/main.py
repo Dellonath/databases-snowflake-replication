@@ -22,6 +22,7 @@ VALID_ENGINES = CONFIG.get('valid_values').get('engine')
 VALID_CLOUD_PROVIDERS = CONFIG.get('valid_values').get('cloud_provider')
 UPLOAD_REMAINING_FILES = CONFIG.get('upload_remaining_files_to_cloud', True)
 
+
 class Main:
     
     def __init__(
