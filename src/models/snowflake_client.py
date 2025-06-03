@@ -12,7 +12,7 @@ class SnowflakeClient:
     """
     Class to manage connections and execute queries on a Snowflake database
     """
-    
+
     def __init__(
         self,
         account: str,
@@ -25,11 +25,11 @@ class SnowflakeClient:
         file_service_client: FileServiceClient,
         cloud_client: AWSCloudClient | GCPCloudClient
     ) -> None:
-        
+
         """
         Initialize the SnowflakeClient and establish a connection to the Snowflake database.
         This constructor reads the connection parameters from environment variables
-        
+
         :param str account: Snowflake's account
         :param str user: Snowflake's username
         :param str password: User password
@@ -40,7 +40,7 @@ class SnowflakeClient:
         :param FileServiceClient file_service_client: File service client to manipulate data files
         :param AWSCloudClient | GCPCloudClient cloud_client: The cloud interface client
         """
-        
+
         self.__account = os.getenv(account)
         self.__user = os.getenv(user)
         self.__password = os.getenv(password)
@@ -48,10 +48,10 @@ class SnowflakeClient:
         self.__warehouse = warehouse.upper()
         self.__database = database.upper()
         self.__schema = schema.upper()
-        
+
         self.__cloud_client = cloud_client
         self.__file_service_client = file_service_client
-        
+
         # snowflake;s ingestion configurations
         self.__storage_integration = 'CT_CARASSO_AWS'
         self.__snowflake_file_format = (
@@ -64,13 +64,13 @@ class SnowflakeClient:
         self, 
         query
     ) -> list:
-        
+
         """
         Execute a query on the Snowflake database
-        
+
         :param str query: The SQL query to execute
         """
-        
+
         try:
             with self.__connection.cursor() as cursor:
                 cursor.execute(query)
@@ -81,7 +81,7 @@ class SnowflakeClient:
         except Exception as e:
             _log.error(f"Error executing query '{query}' in Snowflake: {e}")
             return []
-    
+
     def setup_table_in_snowflake(
         self,
         cloud_storage_path: str,
@@ -99,24 +99,24 @@ class SnowflakeClient:
         self.__create_snowflake_table(table_name=table_name)
         # copying data into the new created table
         self.__execute_copy_command(table_name=table_name)
-    
+
     def __execute_copy_command(
         self,
         table_name: str
     ) -> None:
-        
+
         self.execute_query(f"""
             COPY INTO {self.__database}.{self.__schema}.{table_name.upper()}
                 FROM @stage_{table_name}
                 MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE
                 FILE_FORMAT={self.__snowflake_file_format};
         """)
-        
+
     def __create_snowflake_table(
         self,
         table_name: str
     ) -> None:
-        
+
         self.execute_query(f"""
             CREATE TABLE IF NOT EXISTS {self.__database}.{self.__schema}.{table_name.upper()}
             USING TEMPLATE (
@@ -128,7 +128,7 @@ class SnowflakeClient:
                     )
                 )) ENABLE_SCHEMA_EVOLUTION=true;
         """)
-    
+
     def __create_snowflake_stage(
         self,
         stage_path: str,
@@ -146,18 +146,18 @@ class SnowflakeClient:
                 URL='{stage_url}'
                 FILE_FORMAT={self.__snowflake_file_format};
         """)
-    
+
     def __setup_database_and_schema(
         self
     ) -> None:
-        
+
         self.execute_query(f'CREATE DATABASE IF NOT EXISTS {self.__database}')
         self.execute_query(f'CREATE SCHEMA IF NOT EXISTS {self.__database}.{self.__schema}')
-        
+
     def __setup_snowflake_file_formats(
         self
     ) -> None:
-        
+
         if self.__file_service_client.file_format.lower() == 'parquet':
             self.execute_query(f"""
                 CREATE FILE FORMAT IF NOT EXISTS {self.__database}.{self.__schema}.{self.__snowflake_file_format}
@@ -175,11 +175,11 @@ class SnowflakeClient:
     def __connect_to_snowflake(
         self
     ) -> snowflake.connector:
-        
+
         """
         Establish a connection to the Snowflake database using environment variables
         """
-        
+
         try:
             connection = snowflake.connector.connect(
                 account=self.__account,
@@ -194,15 +194,15 @@ class SnowflakeClient:
             _log.error(f"Failed to connect to Snowflake: {e}")
             raise e
         _log.info("Connected to Snowflake successfully")
-        
+
         return connection
-    
+
     def __del__(
         self
     ) -> None:
-        
+
         """Destructor to close the Snowflake connection"""
-        
+
         if self.__connection:
             try:
                 self.__connection.close()

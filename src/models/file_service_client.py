@@ -18,7 +18,7 @@ class FileServiceClient:
 
         """
         A class to handle writing data to files in different formats
-        
+
         :param str local_storage_directory (optional): The local storage directory where files will be saved temporarily
         :param str file_format (optional): The format of the output files ('csv' or 'parquet')
         :param bool exclude_file_after_uploading (optional): allow excluding files after uploading it to cloud
@@ -34,17 +34,17 @@ class FileServiceClient:
         self,
         path: str
     ) -> list[str]:
-        
+
         """
         List all files in a directory
-        
+
         :param str path: The path to the directory to search for files
         :return: A list of file paths matching the specified pattern
         """
 
         pattern = f'{path}/*'
         files = [file_path.split('/')[-1] for file_path in glob.glob(pattern)]
-        
+
         return files
 
     def write_file(
@@ -63,7 +63,7 @@ class FileServiceClient:
         :param list table_data: The data content to write
         :param list[str] table_columns: The source table columns names
         """
-        
+
         # creating table directory if it does not exist in local 
         os.makedirs(name=local_storage_path, exist_ok=True)
 

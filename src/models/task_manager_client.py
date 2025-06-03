@@ -41,13 +41,13 @@ class TaskManagerClient:
     ) -> str:
 
         if ingestion_mode == 'incremental':
-            query = F"""
-                SELECT 
-                    * 
-                FROM {table_name} 
-                WHERE 
+            query = f"""
+                SELECT
+                    *
+                FROM {table_name}
+                WHERE
                     {incremental_column} > (SELECT MAX({incremental_column}) FROM {table_name})
-                    {'AND '+where if where else ''}'
+                    {'AND ' + where if where else ''}'
             """
         elif ingestion_mode == 'full_load':
             query = f"SELECT * FROM {table_name}"
