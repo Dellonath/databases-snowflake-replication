@@ -99,27 +99,27 @@ class TaskManagerClient:
             f'{database}/'
             f'{table_name}'
         )
-        
+
         cloud_storage_path = (
             f'{self.__cloud_client.cloud_storage_directory}'
             f'{database}/'
             f'{table_name}'
         )
-        
+
         # defining the file name
         timestamp = datetime.datetime.now().strftime(format='%Y%m%d%H%M%S')
         file_name = f'{timestamp}.{self.__file_service_client.file_format}'
-        
+
         self.__file_service_client.write_file(local_storage_path=local_storage_path,
                                               file_name=file_name,
                                               table_data=data,
                                               table_columns=table_columns)
-        
+
         # uploading file to cloud storage and deleting (or not) after completion
         self.__upload_and_delete_file(local_storage_path=local_storage_path,
                                       cloud_storage_path=cloud_storage_path,
                                       file_name=file_name)
-        
+
         # uploading remaining files wheter the flag is set as true
         if self.__file_service_client.upload_remaining_files:
             self.__upload_remaining_files(local_storage_path=local_storage_path,
@@ -144,18 +144,31 @@ class TaskManagerClient:
 
         self.__upload_and_delete_file(local_storage_path=local_storage_path,
                                       cloud_storage_path=cloud_storage_path,
-                                      file_name=file_name)
+                                      file_name=file_name,
+                                      partitionate=False)
             
     def __upload_and_delete_file(
         self,
         local_storage_path: str,
         cloud_storage_path: str,
-        file_name: str
+        file_name: str,
+        partitionate: bool=True
     ) -> None:
+        
+        # partitioning files in cloud
+        if partitionate:
+            datetime_now = datetime.datetime.now()
+            cloud_storage_path += (
+                f'/'
+                f'year={datetime_now.year}/'
+                f'month={datetime_now.month}/'
+                f'day={datetime_now.day}'
+            )
 
         status = self.__cloud_client.upload_file(local_storage_path=local_storage_path,
                                                  cloud_storage_path=cloud_storage_path,
                                                  file_name=file_name)
+
         if status and self.__file_service_client.exclude_file_after_uploading:
             self.__file_service_client.delete_file(path=f'{local_storage_path}/{file_name}')
             
@@ -164,7 +177,7 @@ class TaskManagerClient:
         local_storage_path: str,
         cloud_storage_path: str
     ) -> None:
-    
+
         remaining_files = self.__file_service_client.list_files_in_directory(
             path=local_storage_path
         )

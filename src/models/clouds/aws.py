@@ -46,15 +46,8 @@ class AWSCloudClient:
         :param str file_name: The path local file name
         """
 
-        datetime_now = datetime.datetime.now()
-        partition_name = (
-            f'year={datetime_now.year}/'
-            f'month={datetime_now.month}/'
-            f'day={datetime_now.day}'
-        )
-
         local_storage_file_path = f'{local_storage_path}/{file_name}'
-        cloud_storage_file_path = f'{cloud_storage_path}/{partition_name}/{file_name}'
+        cloud_storage_file_path = f'{cloud_storage_path}/{file_name}'
 
         _log.info(f"Uploading file '{local_storage_file_path}' to S3 in '{cloud_storage_file_path}'")
 
