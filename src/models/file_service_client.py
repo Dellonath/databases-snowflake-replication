@@ -92,7 +92,7 @@ class FileServiceClient:
 
         try:
             os.remove(path)
-            _log.info(f"Direcory/File '{path}' deleted successfully")
+            _log.info(f"File '{path}' deleted successfully")
         except OSError as e:
             _log.error(e)
         except FileNotFoundError:

@@ -132,9 +132,20 @@ class TaskManagerClient:
 
         task_ending_time = datetime.datetime.now()
 
-        _log.info(f"Task completed for table '{database}.{table_name}'." 
+        _log.info(f"Task completed for table '{database}.{table_name}'. " 
                   f'Total time taken: {task_ending_time - task_starting_time}')
 
+    def upload_and_delete_log_file(
+        self,
+        local_storage_path: str,
+        cloud_storage_path: str,
+        file_name: str
+    ) -> None:
+
+        self.__upload_and_delete_file(local_storage_path=local_storage_path,
+                                      cloud_storage_path=cloud_storage_path,
+                                      file_name=file_name)
+            
     def __upload_and_delete_file(
         self,
         local_storage_path: str,
@@ -147,7 +158,7 @@ class TaskManagerClient:
                                                  file_name=file_name)
         if status and self.__file_service_client.exclude_file_after_uploading:
             self.__file_service_client.delete_file(path=f'{local_storage_path}/{file_name}')
-
+            
     def __upload_remaining_files(
         self,
         local_storage_path: str,

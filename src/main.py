@@ -8,17 +8,17 @@ from .models.task_manager_client import TaskManagerClient
 from .models.file_service_client import FileServiceClient
 from .models.cloud_client import CloudClient
 from .models.snowflake_client import SnowflakeClient
-from .logs.logger import _log
+from .logs.logger import _log, LOG_FILE_PATH
 
 load_dotenv()
 
 CONFIG = json.loads(open('config.json').read())
 CONFIG_FILES_PATH = CONFIG.get('configs_path', 'configs')
-MAX_WORKERS = CONFIG.get('max_workers', 10)
-VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
 VALID_INGESTION_MODES = CONFIG.get('valid_values').get('ingestion_mode')
+VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
 VALID_ENGINES = CONFIG.get('valid_values').get('engine')
 VALID_CLOUD_PROVIDERS = CONFIG.get('valid_values').get('cloud_provider')
+MAX_WORKERS = CONFIG.get('max_workers', 10)
 UPLOAD_REMAINING_FILES = CONFIG.get('upload_remaining_files_to_cloud', True)
 
 
@@ -92,12 +92,13 @@ class Main:
                 filtered_tables_configs.append(table_config)
 
             _log.info(f"Starting extraction of {len(filtered_tables_configs)} tables for '{config_file_name}'")
-            TaskManagerClient(
+            task_manager_client = TaskManagerClient(
                 database_client=database_client,
                 file_service_client=file_service_client,
                 cloud_client=cloud_client,
                 snowflake_client=snowflake_client
-            ).start_replication(
+            )
+            task_manager_client.start_replication(
                 tables_configs=filtered_tables_configs,
                 max_workers=MAX_WORKERS
             )
@@ -107,6 +108,13 @@ class Main:
             _log.info(f"Data extraction finished for '{config_file_name}'. "
                       f'Total time taken: {ending_extraction_time - starting_extraction_time}')
 
+        # uploading log file to cloud
+        dirname = os.path.dirname(LOG_FILE_PATH)
+        log_file_name = LOG_FILE_PATH.split('/')[-1]
+        task_manager_client.upload_and_delete_log_file(local_storage_path=dirname,
+                                                       cloud_storage_path=dirname,
+                                                       file_name=log_file_name)
+        
         ending_time = datetime.datetime.now()
         _log.info(f'Extraction completed for all configs! Total time taken: {ending_time - starting_time}')
 

@@ -42,7 +42,7 @@ class AWSCloudClient:
         Upload a file to the S3 bucket
 
         :param str local_storage_path: The local storage location
-        :param str local_storage_path: The cloud storage location
+        :param str cloud_storage_path: The cloud storage location
         :param str file_name: The path local file name
         """
 
