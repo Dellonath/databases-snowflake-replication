@@ -23,7 +23,7 @@ sw_account = snowflake account
 
 <h2>Querying logs</h2>
 
-This query will create a Temporary Stage that allows user analyze the logs stored in the cloud, 
+This query will create a Snowflake's Temporary Stage that allows user analyze the logs stored in the cloud, 
 helping the enginners to find failures root causes:
 ```sql
 CREATE OR REPLACE TEMP STAGE logs
