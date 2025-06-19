@@ -4,8 +4,6 @@
     Project to replicate On-Prem Databases into Snowflake cloud storage
 </p>
 
-<br>
-
 <h2>Requisites</h2>
 
 Mandatory Environment Variables defined in .env to execute replication:

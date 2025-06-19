@@ -50,7 +50,7 @@ class TaskManagerClient:
                     {'AND ' + where if where else ''}'
             """
         elif ingestion_mode == 'full_load':
-            query = f"SELECT * FROM {table_name}"
+            query = f"SELECT * FROM {table_name} {f'WHERE {where}' if where else ''}"
 
         return query
 
@@ -82,7 +82,7 @@ class TaskManagerClient:
                                     where=where,
                                     **kwargs)
 
-        _log.info(f"Starting querying table '{database}.{table_name}' in mode '{ingestion_mode}'")
+        _log.info(f"Starting querying table '{database}.{table_name}' in mode '{ingestion_mode}': '{query}'")
         data = self.__database_client.execute_query(query=query)
 
         if not data:
@@ -115,43 +115,42 @@ class TaskManagerClient:
                                               table_data=data,
                                               table_columns=table_columns)
 
+        # creating stage in snowflake
+        self.__snowflake_client.create_snowflake_stage(stage_path=cloud_storage_path,
+                                                       stage_name=table_name)
+        
         # uploading file to cloud storage and deleting (or not) after completion
         self.__upload_and_delete_file(local_storage_path=local_storage_path,
                                       cloud_storage_path=cloud_storage_path,
-                                      file_name=file_name)
+                                      file_name=file_name,
+                                      table_name=table_name,
+                                      partitionate=self.__cloud_client.partitionate_data)
 
+        # creating snowflake table using infer schema and schema evolution enabled
+        self.__snowflake_client.create_snowflake_table(table_name=table_name)
+        
         # uploading remaining files wheter the flag is set as true
-        if self.__file_service_client.upload_remaining_files:
+        if self.__cloud_client.upload_remaining_files or self.__snowflake_client.upload_remaining_files:
             self.__upload_remaining_files(local_storage_path=local_storage_path,
-                                          cloud_storage_path=cloud_storage_path)
+                                          cloud_storage_path=cloud_storage_path,
+                                          table_name=table_name,
+                                          partitionate=self.__cloud_client.partitionate_data)
 
         # uploading data to Snowflake
         _log.info(f"Setting up and ingesting data table '{database}.{table_name}' into Snowflake")
-        self.__snowflake_client.setup_table_in_snowflake(cloud_storage_path=cloud_storage_path,
-                                                         table_name=table_name)
+        self.__snowflake_client.execute_copy_command(table_name=table_name)
 
         task_ending_time = datetime.datetime.now()
 
         _log.info(f"Task completed for table '{database}.{table_name}'. " 
                   f'Total time taken: {task_ending_time - task_starting_time}')
 
-    def upload_and_delete_log_file(
-        self,
-        local_storage_path: str,
-        cloud_storage_path: str,
-        file_name: str
-    ) -> None:
-
-        self.__upload_and_delete_file(local_storage_path=local_storage_path,
-                                      cloud_storage_path=cloud_storage_path,
-                                      file_name=file_name,
-                                      partitionate=False)
-            
     def __upload_and_delete_file(
         self,
         local_storage_path: str,
         cloud_storage_path: str,
         file_name: str,
+        table_name: str,
         partitionate: bool=True
     ) -> None:
         
@@ -165,17 +164,27 @@ class TaskManagerClient:
                 f'day={datetime_now.day}'
             )
 
-        status = self.__cloud_client.upload_file(local_storage_path=local_storage_path,
-                                                 cloud_storage_path=cloud_storage_path,
-                                                 file_name=file_name)
+        status_cloud = False
+        if self.__cloud_client != None:
+            status_cloud = self.__cloud_client.upload_file(local_storage_path=local_storage_path,
+                                                        cloud_storage_path=cloud_storage_path,
+                                                        file_name=file_name)
+        
+        status_sf_put = False
+        if self.__snowflake_client.stages_type == 'internal':
+            status_sf_put = self.__snowflake_client.execute_put(file_path=local_storage_path,
+                                                                file_name=file_name,
+                                                                stage=table_name)
 
-        if status and self.__file_service_client.exclude_file_after_uploading:
+        if any((status_cloud, status_sf_put)) and self.__file_service_client.exclude_file_after_uploading:
             self.__file_service_client.delete_file(path=f'{local_storage_path}/{file_name}')
             
     def __upload_remaining_files(
         self,
         local_storage_path: str,
-        cloud_storage_path: str
+        cloud_storage_path: str,
+        table_name: str,
+        partitionate: bool=True
     ) -> None:
 
         remaining_files = self.__file_service_client.list_files_in_directory(
@@ -185,7 +194,9 @@ class TaskManagerClient:
             _log.info(f"Uploading remaining file: '{local_storage_path}/{remaining_file}'")
             self.__upload_and_delete_file(local_storage_path=local_storage_path,
                                           cloud_storage_path=cloud_storage_path,
-                                          file_name=remaining_file)
+                                          file_name=remaining_file,
+                                          table_name=table_name,
+                                          partitionate=partitionate)
 
     def start_replication(
         self,
@@ -201,6 +212,11 @@ class TaskManagerClient:
         :param int max_workers: The maximum number of threads to use for parallel processing
         :param str thread_name_prefix: The prefix for the thread names
         """
+        
+        # creating snowflake's database and schema if not exists and using it
+        self.__snowflake_client.setup_database_and_schema()
+        # defining file formats able to deal with schema evolution
+        self.__snowflake_client.setup_snowflake_file_formats()
 
         with ThreadPoolExecutor(max_workers=max_workers,
                                 thread_name_prefix=thread_name_prefix) as executor:

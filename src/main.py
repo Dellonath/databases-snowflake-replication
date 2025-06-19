@@ -8,7 +8,7 @@ from .models.task_manager_client import TaskManagerClient
 from .models.file_service_client import FileServiceClient
 from .models.cloud_client import CloudClient
 from .models.snowflake_client import SnowflakeClient
-from .logs.logger import _log, LOG_FILE_PATH
+from .logs.logger import _log
 
 load_dotenv()
 
@@ -19,8 +19,6 @@ VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
 VALID_ENGINES = CONFIG.get('valid_values').get('engine')
 VALID_CLOUD_PROVIDERS = CONFIG.get('valid_values').get('cloud_provider')
 MAX_WORKERS = CONFIG.get('max_workers', 10)
-UPLOAD_REMAINING_FILES = CONFIG.get('upload_remaining_files_to_cloud', True)
-
 
 class Main:
 
@@ -55,7 +53,7 @@ class Main:
                 extraction_file_config=extraction_file_config, 
                 config_file_name=config_file_name
             ): continue
-            file_service_client = FileServiceClient(**extraction_file_config)
+            self.__file_service_client = FileServiceClient(**extraction_file_config)
 
             database_connection_config = config.pop('database_connection', {})
             if self.__validate_if_database_connection_config_is_invalid(
@@ -63,7 +61,7 @@ class Main:
                 config_file_name=config_file_name
             ): continue
             try:
-                database_client = DatabaseClient(**database_connection_config)
+                self.__database_client = DatabaseClient(**database_connection_config)
             except Exception as e:
                 _log.error(e)
                 continue
@@ -73,12 +71,12 @@ class Main:
                 cloud_config=cloud_config, 
                 config_file_name=config_file_name
             ): continue
-            cloud_client = CloudClient(**cloud_config)
+            self.__cloud_client = CloudClient(**cloud_config)
 
             snowflake_connection_config = config.pop('snowflake_connection', {})
-            snowflake_client = SnowflakeClient(file_service_client=file_service_client,
-                                               cloud_client=cloud_client, 
-                                               **snowflake_connection_config)
+            self.__snowflake_client = SnowflakeClient(file_service_client=self.__file_service_client,
+                                                      cloud_client=self.__cloud_client, 
+                                                      **snowflake_connection_config)
 
             tables_config = config.pop('tables', [])
             filtered_tables_configs = []
@@ -86,19 +84,19 @@ class Main:
 
                 if self.__validate_if_table_config_is_invalid(
                     table_config=table_config,
-                    source_db_tables=database_client.existing_source_tables,
+                    source_db_tables=self.__database_client.existing_source_tables,
                     config_file_name=config_file_name
                 ): continue
                 filtered_tables_configs.append(table_config)
 
             _log.info(f"Starting extraction of {len(filtered_tables_configs)} tables for '{config_file_name}'")
-            task_manager_client = TaskManagerClient(
-                database_client=database_client,
-                file_service_client=file_service_client,
-                cloud_client=cloud_client,
-                snowflake_client=snowflake_client
+            self.__task_manager_client = TaskManagerClient(
+                database_client=self.__database_client,
+                file_service_client=self.__file_service_client,
+                cloud_client=self.__cloud_client,
+                snowflake_client=self.__snowflake_client
             )
-            task_manager_client.start_replication(
+            self.__task_manager_client.start_replication(
                 tables_configs=filtered_tables_configs,
                 max_workers=MAX_WORKERS
             )
@@ -107,13 +105,6 @@ class Main:
 
             _log.info(f"Data extraction finished for '{config_file_name}'. "
                       f'Total time taken: {ending_extraction_time - starting_extraction_time}')
-
-        # uploading log file to cloud
-        dirname = os.path.dirname(LOG_FILE_PATH)
-        log_file_name = LOG_FILE_PATH.split('/')[-1]
-        task_manager_client.upload_and_delete_log_file(local_storage_path=dirname,
-                                                       cloud_storage_path=dirname,
-                                                       file_name=log_file_name)
         
         ending_time = datetime.datetime.now()
         _log.info(f'Extraction completed for all configs! Total time taken: {ending_time - starting_time}')
@@ -123,7 +114,7 @@ class Main:
         path: str
     ) -> list[str]:
         
-        config_files = [f'{path}/{f}' for f in os.listdir(path) if f.endswith('.yaml')]
+        config_files = [f'{path}{f}' for f in os.listdir(path) if f.endswith('.yaml')]
         
         if config_files:
             _log.info(f'Found {len(config_files)} configuration files: {", ".join(config_files)}')

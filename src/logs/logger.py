@@ -1,4 +1,4 @@
-import os 
+import os
 import json
 import time
 import logging
@@ -9,7 +9,7 @@ CONFIG = json.loads(open('config.json').read())
 now_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
 LOG_FILE_PATH = (
     f"{CONFIG.get('logs_path')}"
-    f'log_{now_timestamp.strftime(format='%Y_%m_%d_%H_%M_%S_%Z')}.log'
+    f'_logs.log'
 )
 os.makedirs(name=os.path.dirname(LOG_FILE_PATH), exist_ok=True)
 
