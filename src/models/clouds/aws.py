@@ -3,6 +3,7 @@ import boto3
 from boto3.exceptions import S3UploadFailedError
 from ...logs.logger import _log
 
+
 class AWSCloudClient:
 
     def __init__(
@@ -10,7 +11,6 @@ class AWSCloudClient:
         bucket: str,
         cloud_storage_directory: str='',
         partitionate_data: bool=False,
-        upload_remaining_files: bool=True,
         aws_access_key_id: str=None,
         aws_secret_access_key: str=None,
         region: str=None,
@@ -24,7 +24,6 @@ class AWSCloudClient:
         self.cloud_storage_prefix = 's3://'
         self.cloud_storage_directory = cloud_storage_directory
         self.partitionate_data = partitionate_data
-        self.upload_remaining_files = upload_remaining_files
         self.bucket = bucket
 
         self.__storage_client = boto3.client(

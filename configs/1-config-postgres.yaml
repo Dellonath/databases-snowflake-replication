@@ -3,7 +3,7 @@ description: Postgres replication of sales and products data
 cloud:
   provider: aws
   bucket: ct-carasso-poc
-  upload_remaining_files: true
+  partitionate_data: false
 snowflake_connection:
   account: sw_account
   user: sw_user
@@ -12,8 +12,8 @@ snowflake_connection:
   warehouse: COMPUTE_WH
   database: CARASSO_POC_DB
   schema: POSTGRES
-  stages_type: internal
-  upload_remaining_files: true
+  stages_type: external
+  storage_integration: CT_CARASSO_AWS
 database_connection:
   engine: postgresql+psycopg2
   host: localhost
@@ -28,14 +28,9 @@ extraction_file:
   exclude_file_after_uploading: true
 tables:
   - table_name: customers
-    ingestion_mode: full_load
+    where: customer_id <= 6
   - table_name: items
-    ingestion_mode: full_load
   - table_name: transactions
-    ingestion_mode: full_load
   - table_name: departments
-    ingestion_mode: full_load
   - table_name: product_reviews
-    ingestion_mode: full_load
   - table_name: item_department_links
-    ingestion_mode: full_load

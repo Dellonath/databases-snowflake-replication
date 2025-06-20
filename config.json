@@ -2,7 +2,6 @@
     "configs_path": "configs/",
     "logs_path": "logs/",
     "valid_values": {
-        "ingestion_mode": ["incremental", "full_load"],
         "file_format": ["csv", "parquet"],
         "engine": ["mysql+pymysql", "postgresql+psycopg2"],
         "cloud_provider": ["aws"]

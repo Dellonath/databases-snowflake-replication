@@ -9,7 +9,6 @@ class GCPCloudClient:
             bucket: str,
             cloud_storage_directory: str='',
             partitionate_data: bool=False,
-            upload_remaining_files: bool=False,
             **kwargs
         ) -> None:
         
@@ -20,7 +19,6 @@ class GCPCloudClient:
         self.cloud_storage_prefix = 'gs://'
         self.cloud_storage_directory = cloud_storage_directory
         self.partitionate_data = partitionate_data
-        self.upload_remaining_files = upload_remaining_files
         self.bucket = bucket
         
     def upload_file(

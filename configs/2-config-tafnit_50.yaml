@@ -1,10 +1,9 @@
-config_enabled: true
+config_enabled: false
 description: TAFNIT 50 Replication Configuration
 cloud:
   provider: aws
   bucket: ct-carasso-poc
   partitionate_data: true
-  upload_remaining_files: true
 snowflake_connection:
   account: sw_account
   user: sw_user
@@ -13,8 +12,8 @@ snowflake_connection:
   warehouse: COMPUTE_WH
   database: CARASSO_POC_DB
   schema: TAFNIT_50
-  stages_type: internal
-  upload_remaining_files: true
+  storage_integration: CT_CARASSO_AWS
+  stages_type: external
 database_connection:
   engine: mysql+pymysql
   host: localhost
@@ -28,14 +27,8 @@ extraction_file:
   exclude_file_after_uploading: true
 tables:
   - table_name: users
-    ingestion_mode: full_load
   - table_name: products
-    ingestion_mode: full_load
   - table_name: orders 
-    ingestion_mode: full_load
   - table_name: categories
-    ingestion_mode: full_load
   - table_name: reviews
-    ingestion_mode: full_load
   - table_name: product_category_links
-    ingestion_mode: full_load

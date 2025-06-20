@@ -44,7 +44,7 @@ class DatabaseClient:
         self.database = database
         self.schema = database if schema is None else schema
         self.__db_engine = self.__create_engine()
-        self.existing_source_tables = self.__list_source_tables()
+        self.source_tables = self.__list_source_tables()
         self.tables_columns = self.__list_source_tables_columns()
 
     def execute_query(
@@ -65,13 +65,13 @@ class DatabaseClient:
                 
             return rows
         except ProgrammingError as e:
-            _log.error(e)
+            _log.error(f'Failed to execute query in database: {e}')
         except NoSuchTableError as e:
-            _log.error(e)
+            _log.error(f'Failed to execute query in database: {e}')
         except DatabaseError as e:
-            _log.error(e)
+            _log.error(f'Failed to execute query in database: {e}')
         except OperationalError as e:
-            _log.error(e)
+            _log.error(f'Failed to execute query in database: {e}')
 
         return []
 
@@ -82,16 +82,16 @@ class DatabaseClient:
         """Get the columns of a table"""
 
         tables_columns = dict()
-        for table_name in self.existing_source_tables:
+        for table_name in self.source_tables:
             try:
                 inspector = inspect(subject=self.__db_engine)
                 columns = inspector.get_columns(table_name=table_name)
                 tables_columns[table_name] = [column['name'] for column in columns]
             except ProgrammingError as e:
-                _log.error(e)
+                _log.error(f'Error listing tables columns: {e}')
             except DatabaseError as e:
-                _log.error(e)
-        
+                _log.error(f'Error listing tables columns: {e}')
+
         return tables_columns
 
     def __list_source_tables(
@@ -100,10 +100,11 @@ class DatabaseClient:
 
         """Get the list of tables in a schema"""
 
-        if 'mysql' in self.__engine or 'postgresql' in self.__engine:
+        if self.__engine in ('postgresql+psycopg2', 'mysql+pymysql'):
             query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{self.schema}'"
+        list_of_tables_names = {table_config[0] for table_config in self.execute_query(query=query)}
 
-        return {table_config[0] for table_config in self.execute_query(query=query)}
+        return list_of_tables_names
     
     def __create_engine(
         self
@@ -121,4 +122,4 @@ class DatabaseClient:
             _log.info(f"Connection for '{self.database}' database established successfully")       
             return engine
         except OperationalError as e:
-            _log.error(e)
+            _log.error(f'Error creating engine for database: {e}')

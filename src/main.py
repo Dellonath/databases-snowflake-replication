@@ -14,7 +14,6 @@ load_dotenv()
 
 CONFIG = json.loads(open('config.json').read())
 CONFIG_FILES_PATH = CONFIG.get('configs_path', 'configs')
-VALID_INGESTION_MODES = CONFIG.get('valid_values').get('ingestion_mode')
 VALID_FILE_FORMATS = CONFIG.get('valid_values').get('file_format')
 VALID_ENGINES = CONFIG.get('valid_values').get('engine')
 VALID_CLOUD_PROVIDERS = CONFIG.get('valid_values').get('cloud_provider')
@@ -71,12 +70,16 @@ class Main:
                 cloud_config=cloud_config, 
                 config_file_name=config_file_name
             ): continue
-            self.__cloud_client = CloudClient(**cloud_config)
+            self.__cloud_client = CloudClient(**cloud_config) if cloud_config else None
 
             snowflake_connection_config = config.pop('snowflake_connection', {})
+            if self.__validate_if_snowflake_connection_config_is_invalid(
+                snowflake_connection_config=snowflake_connection_config, 
+                config_file_name=config_file_name
+            ): continue
             self.__snowflake_client = SnowflakeClient(file_service_client=self.__file_service_client,
                                                       cloud_client=self.__cloud_client, 
-                                                      **snowflake_connection_config)
+                                                      **snowflake_connection_config) if snowflake_connection_config else None
 
             tables_config = config.pop('tables', [])
             filtered_tables_configs = []
@@ -84,7 +87,7 @@ class Main:
 
                 if self.__validate_if_table_config_is_invalid(
                     table_config=table_config,
-                    source_db_tables=self.__database_client.existing_source_tables,
+                    source_db_tables=self.__database_client.source_tables,
                     config_file_name=config_file_name
                 ): continue
                 filtered_tables_configs.append(table_config)
@@ -114,7 +117,8 @@ class Main:
         path: str
     ) -> list[str]:
         
-        config_files = [f'{path}{f}' for f in os.listdir(path) if f.endswith('.yaml')]
+        # ordering configuration files for efficiency
+        config_files = sorted([f'{path}{f}' for f in os.listdir(path) if f.endswith('.yaml')])
         
         if config_files:
             _log.info(f'Found {len(config_files)} configuration files: {", ".join(config_files)}')
@@ -137,6 +141,47 @@ class Main:
                 _log.error(e)
         return parsed_config
 
+    def __validate_if_snowflake_connection_config_is_invalid(
+        self,
+        snowflake_connection_config: str,
+        config_file_name: str
+    ) -> bool:
+        
+        if not snowflake_connection_config:
+            _log.warning(f"No Snowflake connection parameters defined in '{config_file_name}'. "
+                         'Replication will assume no Snowflake instance in replication...')
+            return False
+
+        config_sf_account = snowflake_connection_config.get('account')
+        config_sf_user = snowflake_connection_config.get('user')
+        config_sf_password = snowflake_connection_config.get('password')
+        config_sf_role = snowflake_connection_config.get('role')
+        config_sf_warehouse = snowflake_connection_config.get('warehouse')
+        config_sf_database = snowflake_connection_config.get('database')
+        config_sf_schema = snowflake_connection_config.get('schema')
+        if not all([config_sf_account,
+                    config_sf_user,
+                    config_sf_password,
+                    config_sf_role,
+                    config_sf_warehouse,
+                    config_sf_database,
+                    config_sf_schema]):
+            _log.error(f"Snowflake parameters connection missing for '{config_file_name}'. "
+                        'Check if required account, user, password, role, warehouse, database and schema are set')
+            return True
+
+        config_stages_type = snowflake_connection_config.get('stages_type')
+        if config_stages_type not in ['external', 'internal']:
+            _log.error(f"Snowflake's parameter '{config_stages_type}' defined in '{config_file_name}' is invalid, "
+                        "should be one of ['external', 'internal']. Skipping replication...")
+            return True
+
+        config_storage_integration = snowflake_connection_config.get('storage_integration')
+        if config_stages_type == 'external' and (self.__cloud_client == None or config_storage_integration == None):
+            _log.error(f"Both 'snowflake_connection.storage_integration' and 'cloud' configs are mandatory in case of using external stages. "
+                       f"Adjust {config_file_name}' file for correct funcionality. Skipping replication...")
+            return True
+
     def __validate_if_config_is_disabled(
         self,
         config: str,
@@ -145,7 +190,7 @@ class Main:
         
         config_enabled = config.get('config_enabled', True)
         if not config_enabled:
-            _log.warning(f"Skipping disabled replication defined in '{config_file_name}'")
+            _log.info(f"Skipping replication defined in '{config_file_name}' due to config_enabled=false")
             return True
 
     def __validate_if_cloud_config_is_invalid(
@@ -155,15 +200,15 @@ class Main:
     ) -> bool:
         
         if not cloud_config:
-            _log.error(f"No cloud configuration defined in '{config_file_name}'. "
-                        "Skipping replication...")
-            return True
+            _log.warning(f"No cloud configuration defined in '{config_file_name}'. "
+                          "Replication will assume no public cloud to store data...")
+            return False
 
         cloud_provider = cloud_config.get('provider')
         if cloud_provider not in VALID_CLOUD_PROVIDERS:
             _log.error(f"Invalid cloud provider '{cloud_provider}' defined in '{config_file_name}'. "
-                       f"Expected one of {VALID_CLOUD_PROVIDERS}. Others providers aren't supported yet"
-                       f"Create a new model.clouds.<provider>_client.py to support it")
+                       f"Expected one of {VALID_CLOUD_PROVIDERS}, tthers providers aren't supported yet. "
+                       f'Create a new model.clouds.<provider>_client.py to support <provider> cloud')
             return True
 
     def __validate_if_extraction_file_config_is_invalid(
@@ -207,7 +252,6 @@ class Main:
                     config_db_database]):
             _log.error(f"Database parameters connection missing for '{config_file_name}'. "
                         'Check if required host, port, username, password and database are set')
-
             return True
         
         config_db_schema = database_connection_config.get('schema')
@@ -242,16 +286,4 @@ class Main:
         if table_name not in source_db_tables:
             _log.error(f"Table '{table_name}' defined in '{config_file_name}' " 
                         'does not exist in the source database. Skipping table...')
-            return True
-
-        ingestion_mode = table_config.get('ingestion_mode')
-        if ingestion_mode not in VALID_INGESTION_MODES:
-            _log.error(f"Invalid ingestion mode '{ingestion_mode}' defined in '{config_file_name}': " 
-                        f'Expected one of {VALID_INGESTION_MODES}. Skipping table...')
-            return True
-
-        incremental_key = table_config.get('incremental_column')
-        if ingestion_mode == 'incremental' and not incremental_key:
-            _log.error(f"No incremental key defined for '{table_name}' in '{config_file_name}'. " 
-                        f'Skipping table...')
             return True

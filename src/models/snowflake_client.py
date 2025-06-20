@@ -1,9 +1,11 @@
 import os
-import snowflake.connector
 from dotenv import load_dotenv
+import snowflake.connector
+from snowflake.connector.errors import DatabaseError, ProgrammingError
 from .cloud_client import AWSCloudClient, GCPCloudClient
 from .file_service_client import FileServiceClient
 from ..logs.logger import _log
+
 
 load_dotenv()
 
@@ -15,17 +17,17 @@ class SnowflakeClient:
 
     def __init__(
         self,
-        account: str,
-        user: str,
-        password: str,
-        role: str,
-        warehouse: str,
-        database: str,
-        schema: str,
-        file_service_client: FileServiceClient,
+        account: str=None,
+        user: str=None,
+        password: str=None,
+        role: str=None,
+        warehouse: str=None,
+        database: str=None,
+        schema: str=None,
+        file_service_client: FileServiceClient=None,
         cloud_client: AWSCloudClient | GCPCloudClient=None,
-        stages_type: str='internal',
-        upload_remaining_files: bool=True
+        storage_integration: str=None,
+        stages_type: str='internal'
     ) -> None:
 
         """
@@ -41,8 +43,8 @@ class SnowflakeClient:
         :param str schema: The database's schema name
         :param FileServiceClient file_service_client: File service client to manipulate data files
         :param AWSCloudClient | GCPCloudClient cloud_client (optional): The cloud interface client
-        :param str stages_type (optional): Defines if stages created in Snowflake are internal or external stages
-        :param bool upload_remaining_files (optional): Upload all remaining files to internal stage if stages_type=internal
+        :param str stages_type (optional): Defines which stages type use either 'internal' or 'external'. If external, cloud_client need be provided
+        :param str storage_integration (optional): Provide Snowflake's Storage Integration to be used in case of external stages
         """
 
         self.__account = os.getenv(account)
@@ -54,11 +56,11 @@ class SnowflakeClient:
         self.__schema = schema.upper()
 
         self.__file_service_client = file_service_client
+
+        # data cloud configs
         self.__cloud_client = cloud_client
         self.stages_type = stages_type
-
-        # snowflake;s ingestion configurations
-        self.__storage_integration = 'CT_CARASSO_AWS'
+        self.__storage_integration = storage_integration
         self.__snowflake_file_format = (
             f'CARASSO_{self.__file_service_client.file_format.upper()}_SCHEMA_EVOLUTION'
         )
@@ -80,10 +82,8 @@ class SnowflakeClient:
             with self.__connection.cursor() as cursor:
                 cursor.execute(query)
                 rows = [row for row in cursor.fetchall()]
-                
             return rows
-        
-        except Exception as e:
+        except ProgrammingError as e:
             _log.error(f"Error executing query '{query}' in Snowflake: {e}")
             return []
 
@@ -91,7 +91,7 @@ class SnowflakeClient:
         self, 
         file_path: str,
         file_name: str,
-        stage: str
+        stage_name: str
     ) -> list:
 
         """
@@ -99,10 +99,19 @@ class SnowflakeClient:
 
         :param str file_path: The path to the file
         :param str file_name: The file name
-        :param str stage: The stage name
+        :param str stage_name: The stage name
         """
         
-        self.execute_query(f'PUT file://{file_path}/{file_name} @STAGE_{stage}')
+        try:
+            full_qualified_table_name = f'{self.__database}.{self.__schema}.{stage_name}'.upper()
+            file_for_put_path = f'file://{file_path}/{file_name}'
+            _log.info(f"Uploading file '{file_path}/{file_name}' into stage '@{full_qualified_table_name}' using PUT command")
+            self.execute_query(f'PUT {file_for_put_path} @{stage_name}')
+            return True
+        except:
+            _log.error(f"Failed uploading file '{file_path}/{file_name}' into stage '@{full_qualified_table_name}' using PUT command. "
+                       f"File will be kept in local storage...")
+            return False
 
     def execute_copy_command(
         self,
@@ -116,11 +125,11 @@ class SnowflakeClient:
         # (files already loaded are loaded again, duplicating data when executing copy command)
         _log.info(f"Truncating table '{full_qualified_table_name}' in Snowflake")
         self.execute_query(f'DELETE FROM {full_qualified_table_name}')
-        
+
         _log.info(f"Executing COPY command for table '{full_qualified_table_name}'")
         self.execute_query(f"""
             COPY INTO {full_qualified_table_name}
-                FROM @STAGE_{table_name}
+                FROM @{table_name}
                 MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE
                 FILE_FORMAT={self.__snowflake_file_format}
         """)
@@ -132,13 +141,14 @@ class SnowflakeClient:
 
         full_qualified_table_name = f'{self.__database}.{self.__schema}.{table_name}'.upper()
 
+        _log.info(f"Creating table '{full_qualified_table_name}' in Snowflake")
         self.execute_query(f"""
             CREATE TABLE IF NOT EXISTS {full_qualified_table_name}
             USING TEMPLATE (
                     SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*))
                     FROM TABLE(
                         INFER_SCHEMA(
-                            LOCATION=>'@STAGE_{table_name}',
+                            LOCATION=>'@{table_name}',
                             FILE_FORMAT=>'{self.__snowflake_file_format}'
                         )
                     )
@@ -157,15 +167,17 @@ class SnowflakeClient:
                 f'{self.__cloud_client.bucket}/'
                 f'{stage_path}'
             )
+            _log.info(f"Creating external stage '@{self.__database}.{self.__schema}.{stage_name}'")
             self.execute_query(f"""
-                CREATE STAGE IF NOT EXISTS stage_{stage_name}
+                CREATE STAGE IF NOT EXISTS {stage_name}
                     STORAGE_INTEGRATION={self.__storage_integration}
                     URL='{stage_url}'
                     FILE_FORMAT={self.__snowflake_file_format};
             """)
         elif self.stages_type == 'internal':
+            _log.info(f"Creating internal stage '@{self.__database}.{self.__schema}.{stage_name}'")
             self.execute_query(f"""
-                CREATE STAGE IF NOT EXISTS stage_{stage_name}
+                CREATE STAGE IF NOT EXISTS {stage_name}
                     FILE_FORMAT={self.__snowflake_file_format};
             """)
 
@@ -212,12 +224,13 @@ class SnowflakeClient:
                 database=self.__database,
                 schema=self.__schema
             )
-        except Exception as e:
-            _log.error(f'Failed to connect to Snowflake: {e}')
-            raise e
-        _log.info('Connected to Snowflake successfully')
+            _log.info('Connected to Snowflake successfully')
 
-        return connection
+            return connection 
+        except DatabaseError as e:
+            _log.error(f'Failed to connect to Snowflake: {e}')
+
+        return False
 
     def __del__(
         self

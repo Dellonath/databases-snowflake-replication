@@ -6,35 +6,71 @@
 
 <h2>Requisites</h2>
 
-Mandatory Environment Variables defined in .env to execute replication:
+Environment variables defined in .env for proper ELT replication execution:
 ```
-aws_access_key_id = aws access key
-aws_secret_access_key = aws secret access key
-region = aws region
-mysql_password = database passoword to access mysql
-postgres_password = database passoword to access postgres
-sw_user = snowflake user
-sw_role = snowflake role
-sw_password = snowflakse user password
-sw_account = snowflake account
+aws_access_key_id=aws access key
+aws_secret_access_key=aws secret access key
+region=aws region
+mysql_password=database passoword to access mysql
+postgres_password=database passoword to access postgres
+sw_user=snowflake user
+sw_role=snowflake role
+sw_password=snowflakse user password
+sw_account=snowflake account
 ```
 
-<h2>Querying logs</h2>
+Just define the variables that are relevant for the data ecosystem context. E.g., do not define <i>postgres_password</i> if no postgres database will be replicated.  
 
-This query will create a Snowflake's Temporary Stage that allows user analyze the logs stored in the cloud, 
-helping the enginners to find failures root causes:
-```sql
-CREATE OR REPLACE TEMP STAGE logs
-  STORAGE_INTEGRATION=<STORAGE_INTEGRATION>
-  URL='s3://<bucket>>/logs/year=<year>/month=<month>/day=<day>/'
-  FILE_FORMAT=(TYPE='CSV', FIELD_DELIMITER='|');
-SELECT 
-    logs.$1 asctime, 
-    logs.$2 levelname, 
-    logs.$3 message
-FROM @logs logs
-ORDER BY logs.$1
+<h2>Configuration</h2>
+
+This section lists all possibles (mandatory or optional) parameters, descriptions and the file's structure. This config files specifies the credentials for Database, Snowflake and Public Cloud connection, as well as operational parameters to ensure good funcionality and optimized execution. The ```config.json``` file stores global configurations.
+
+To add a new ELT replication, just create a new configuration YAML file in <i>configs</i> folder, following the pattern: <i><b><file_number></b>-config-<b><replication_name></b>.yaml</i>. Where file number identifies the file id and replication name a human-friendly name.
+
+> **⚠️ <span style="color:red">Warning</span>:** Make sure the <i>username</i> defined in <i>database_connection</i> has only SELECT privilege. It's very important to prevent any SQL injection attack.
+
+```yaml
+config_enabled: (bool) Enables or disables the ELT configuration. Set to true to activate the pipeline
+description: (str) A brief summary of the ELT process or pipeline purpose
+cloud:
+  provider: (str) The cloud service provider ('aws', 'gcp' or ...)
+  bucket: (str) The name of the cloud storage bucket used for staging or storing files
+  # partitionate_data: (bool) (optional) Indicates whether to partition data in the cloud storage, default value is False
+  # aws_access_key_id: (str) (optional) Environment variable name with AWS Access Key ID to connect to AWS cloud platform, default value takes aws_access_key_id from .aws/credentials
+  # aws_secret_access_key: (str) (optional) Environment variable name with AWS Secret Access Key to connect to AWS cloud platform, default value takes aws_secret_access_key from .aws/credentials
+  # region: (str) (optional) Environment variable name with AWS Region, default value takes region from .aws/credentials
+snowflake_connection:
+  account: (str) Environment variable name with Snowflake account identifier value
+  user: (str) Environment variable name with username value for Snowflake authentication
+  password: (str) Environment variable name with password value for Snowflake authentication
+  role: (str) Environment variable name with Snowflake user role value for session
+  warehouse: (str) Snowflake virtual warehouse for compute resources
+  database: (str) Target Snowflake database
+  schema: (str) Target schema within the Snowflake database
+  # stages_type: (str) (optional) Type of Snowflake stage in lowercase ('external' or 'internal'), default value is 'internal'
+  # storage_integration: (str) (optional) Name of the Snowflake storage integration, mandatory in case of snowflake_connection.stages_type defined as 'external', default None
+database_connection:
+  engine: (str) SQLAlchemy engine string for the database type and driver
+  host: (str) Environment variable name with hostname or IP address value of the source database
+  port: (int) Port number for the database connection
+  username: (str) Environment variable name with username value for database authentication
+  password: (str) Environment variable name with password value for database authentication
+  database: (str) Name of the source database
+  # schema: (str) (optional) Schema within the source database, default value assumes database name 
+extraction_file: 
+  # file_format: (str) (optional) Format of the extracted files in lowercase ('csv' or 'parquet')
+  # local_storage_directory: (str) (optional) Local directory path for temporary file storage, default value is 'data/'
+  # exclude_file_after_uploading: (bool) (optional) Whether to delete local files after uploading to public cloud storage or Snowflake stage, default value is True
+tables: 
+  - table_name: Table name on source database to be extracted
+    # where: (str) (optional) SQL where statement to be applied to the query (select * from table where <where>)
+  - ...
 ```
+
+<b>Notes</b>:
+- The <i>cloud</i> parameter is an optional set of config, if not declared then the replication will assume no public cloud and not push files to any public cloud storage. If declared, files will be uploaded to the specified cloud storage bucket and then deleted in local storage if <i>extraction_file.exclude_file_after_uploading</i>=true. But, <i>cloud</i> is mandatory in case of (<i>snowflake_connection.stages_type</i>='external').
+- The <i>snowflake_connection</i> parameter is an optional set of config, if not declared then the replication will assume no Snowflake account and not push files into Snowflake stages. If declared, files will be uploaded to the Snowflake stages (internal or external) and then deleted in local storage if <i>extraction_file.exclude_file_after_uploading</i>=true.
+- In case of no <i>cloud</i> and <i>snowflake_connection</i> declared in ELT config files, data will extracted from source database and stored in the local storage (and won't be deleted) until either <i>cloud</i> or <i>snowflake_connection</i> was declared defined. After that, all historical data will be pushed as remaining file into the defined cloud tool.
 
 <h2>Schema evolution</h2>
 
