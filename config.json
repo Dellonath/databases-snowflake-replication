@@ -3,7 +3,7 @@
     "logs_path": "logs/",
     "valid_values": {
         "file_format": ["csv", "parquet"],
-        "engine": ["mysql+pymysql", "postgresql+psycopg2"],
+        "engine": ["mysql+pymysql", "postgresql+psycopg2", "com.intersys.jdbc.CacheDriver"],
         "cloud_provider": ["aws"]
     },
     "tasks": {

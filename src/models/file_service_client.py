@@ -40,7 +40,8 @@ class FileServiceClient:
         """
 
         pattern = f'{path}/*'
-        files = [file_path.split('/')[-1] for file_path in glob.glob(pattern)]
+        # replacing '\' chat to '/' to work in both windows and linux OS systems 
+        files = [file_path.replace('\\', '/').split('/')[-1] for file_path in glob.glob(pattern)]
 
         return files
 
@@ -55,7 +56,7 @@ class FileServiceClient:
         """
         Write data to a file in the specified format
         
-        :param str local_storage_table_path: The local storage where table should be loaded
+        :param str local_storage_path: The local storage where table should be saved
         :param str file_name: The output file name
         :param list table_data: The data content to write
         :param list[str] table_columns: The source table columns names
@@ -65,8 +66,7 @@ class FileServiceClient:
         os.makedirs(name=local_storage_path, exist_ok=True)
 
         file_path = f'{local_storage_path}/{file_name}'
-        _log.info(f"Writing {self.file_format} file to path: '{file_path}'")
-
+        _log.info(f"Writing {self.file_format} file with {len(table_data)} rows in path '{file_path}'")
         if self.file_format == 'parquet':
             self.__write_parquet(file_path=file_path,
                                  table_data=table_data,
@@ -112,7 +112,10 @@ class FileServiceClient:
 
         try:
             with open(file=file_path, mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f, delimiter='|')
+                writer = csv.writer(f, 
+                                    delimiter=',',
+                                    quoting=csv.QUOTE_MINIMAL,
+                                    quotechar='"')
                 writer.writerow(table_columns)
                 writer.writerows(table_data)
         except OSError as e:
@@ -137,7 +140,7 @@ class FileServiceClient:
 
         try:
             data_dict = {col: [row[idx] for row in table_data]
-                                    for idx, col in enumerate(table_columns)}
+                            for idx, col in enumerate(table_columns)}
 
             table = pa.table(data_dict)
             pq.write_table(table=table, where=file_path)

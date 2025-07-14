@@ -6,10 +6,10 @@ import datetime
 
 CONFIG = json.loads(open('config.json').read())
 
-now_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
+timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime(format='%Y%m%d%H%M%S')
 LOG_FILE_PATH = (
     f"{CONFIG.get('logs_path')}"
-    f'_logs.log'
+    f'_logs_{timestamp}.log'
 )
 os.makedirs(name=os.path.dirname(LOG_FILE_PATH), exist_ok=True)
 

@@ -1,0 +1,30 @@
+-- necessary in case of replacing authentication service
+-- CREATE OR REPLACE AUTHENTICATION POLICY SPN_CACHE_REPLICATION_PAT_AUTH_POLICY
+--   AUTHENTICATION_METHODS = ( 'PROGRAMMATIC_ACCESS_TOKEN' )
+--   PAT_POLICY = ( DEFAULT_EXPIRY_IN_DAYS=15, MAX_EXPIRY_IN_DAYS=365, NETWORK_POLICY_EVALUATION=NOT_ENFORCED )
+--   COMMENT = 'Authentication policy used for SPN_CACHE_REPLICATION';
+-- SHOW AUTHENTICATION POLICIES;
+
+-- creating network policy to list allowed and blocked IPs
+-- no list was defined, then it accepts any requests
+CREATE OR REPLACE NETWORK POLICY SPN_CACHE_REPLICATION_PAT_NETWORK_POLICY
+  COMMENT = 'Network Policy for PAT generation';
+SHOW NETWORK POLICIES;
+
+-- creating service user
+CREATE OR REPLACE USER SPN_CACHE_REPLICATION
+  TYPE=SERVICE
+  DEFAULT_WAREHOUSE='INGESTION_WH'
+  NETWORK_POLICY='SPN_CACHE_REPLICATION_PAT_NETWORK_POLICY'
+  COMMENT='SPN used to Caché database replication';
+SHOW USERS;
+
+-- explicitaly granting ACCOUNTADMIN role to service user (DEFAULT_ROLE in CREATE USER statement does not work)
+GRANT ROLE ACCOUNTADMIN TO USER SPN_CACHE_REPLICATION;
+
+-- generating PAT token
+-- output will show the token name and token secret
+ALTER USER IF EXISTS SPN_CACHE_REPLICATION ADD PAT SPN_CACHE_REPLICATION_PAT
+  ROLE_RESTRICTION = 'ACCOUNTADMIN' 
+  DAYS_TO_EXPIRY = 5
+  COMMENT = 'PAT for SPN_CACHE_REPLICATION_PAT to use in python connector';

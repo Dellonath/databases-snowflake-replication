@@ -6,6 +6,16 @@ __pycache__/
 # C extensions
 *.so
 
+# Data directories
+data/
+data-raw/
+temp/
+tmp/
+
+# Credentials
+.cred/
+*.cred
+
 # Distribution / packaging
 .Python
 build/

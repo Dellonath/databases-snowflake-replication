@@ -1,0 +1,42 @@
+config_enabled: true
+description: Example of ELT config for postgres databases to load CRM data from on-premise database
+# cloud:
+#   provider: aws
+#   bucket: ct-carasso-poc
+#   partitionate_data: false
+snowflake_connection:
+  authenticator: SNOWFLAKE_JWT
+  account: sf_account
+  user: sf_user
+  private_key_file: sf_private_key_file
+  private_key_file_pwd: sf_private_key_file_pwd
+  raw_database: RAW
+  dwh_database: DWH
+  warehouse: COMPUTE_WH
+  schema: CRM
+  stages_type: internal
+database_connection:
+  engine: postgresql+psycopg2
+  host: postgres_db_host
+  port: postgres_db_port
+  username: postgres_db_username
+  password: postgres_db_password
+  database: postgres
+  schema: public
+extraction_file:
+  local_storage_directory: tmp/
+  file_format: csv
+  exclude_file_after_uploading: true
+tables:
+  - table: customers
+    size: 5
+  - table: items
+    fields:
+      - item_id
+      - description
+  - table: emptychassis
+  - table: transactions
+  - table: departments
+  - table: product_reviews
+    table_renamed: reviews
+  - table: item_department_links

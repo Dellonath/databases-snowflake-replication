@@ -78,7 +78,7 @@ class Main:
                 config_file_name=config_file_name
             ): continue
             self.__snowflake_client = SnowflakeClient(file_service_client=self.__file_service_client,
-                                                      cloud_client=self.__cloud_client, 
+                                                      cloud_client=self.__cloud_client,
                                                       **snowflake_connection_config) if snowflake_connection_config else None
 
             tables_config = config.pop('tables', [])
@@ -152,7 +152,10 @@ class Main:
                          'Replication will assume no Snowflake instance in replication...')
             return False
 
+        config_sf_authenticator = snowflake_connection_config.get('authenticator')
         config_sf_account = snowflake_connection_config.get('account')
+        private_key_file = snowflake_connection_config.get('private_key_file')
+        private_key_file_pwd = snowflake_connection_config.get('private_key_file_pwd')
         config_sf_user = snowflake_connection_config.get('user')
         config_sf_password = snowflake_connection_config.get('password')
         config_sf_role = snowflake_connection_config.get('role')
@@ -161,18 +164,26 @@ class Main:
         config_sf_schema = snowflake_connection_config.get('schema')
         if not all([config_sf_account,
                     config_sf_user,
-                    config_sf_password,
-                    config_sf_role,
-                    config_sf_warehouse,
-                    config_sf_database,
                     config_sf_schema]):
             _log.error(f"Snowflake parameters connection missing for '{config_file_name}'. "
-                        'Check if required account, user, password, role, warehouse, database and schema are set')
-            return True
+                        'Check if required account, user, schema are set')
+        
+        if config_sf_authenticator == 'SNOWFLAKE_JWT':
+            if not all([private_key_file,
+                        private_key_file_pwd]):
+                _log.error(f'Snowflake parameters private_key_file and private_key_file_pwd are mandatory '
+                            "for 'SNOWFLAKE_JWT' authentication. "
+                            "For more info check: 'https://docs.snowflake.com/en/user-guide/key-pair-auth'. "
+                            "Or check file stc/utils/snowflake_keypair_authentication.sql")
+                return True
+        else:
+            if not all([config_sf_password]):
+                _log.error("Snowflake parameter password is mandatory for 'SNOWFLAKE' authentication method.")
+                return True
 
         config_stages_type = snowflake_connection_config.get('stages_type')
         if config_stages_type not in ['external', 'internal']:
-            _log.error(f"Snowflake's parameter '{config_stages_type}' defined in '{config_file_name}' is invalid, "
+            _log.error(f"Snowflake's parameter 'stages_type' defined in '{config_file_name}' is invalid, "
                         "should be one of ['external', 'internal']. Skipping replication...")
             return True
 
@@ -234,14 +245,14 @@ class Main:
                         'Skipping replication...')
             return True
 
-        config_db_engine = database_connection_config.get('engine').lower()
+        config_db_engine = database_connection_config.get('engine')
         if not config_db_engine or config_db_engine not in VALID_ENGINES:
             _log.error(f"Invalid database engine '{config_db_engine}' defined in '{config_file_name}'. "
                        f'Expected one of {VALID_ENGINES}')
             return True
 
         config_db_host = database_connection_config.get('host')
-        config_db_port = int(database_connection_config.get('port'))
+        config_db_port = database_connection_config.get('port')
         config_db_username = database_connection_config.get('username')
         config_db_password = database_connection_config.get('password')
         config_db_database = database_connection_config.get('database')
@@ -254,6 +265,13 @@ class Main:
                         'Check if required host, port, username, password and database are set')
             return True
         
+        config_db_jar_file_path = database_connection_config.get('jar_file_path')
+        if config_db_engine == 'com.intersys.jdbc.CacheDriver' and not config_db_jar_file_path:
+            _log.error(f"Database parameter 'jar_file_path' missing for '{config_file_name}'. "
+                        "This parameter is mandatory when using 'com.intersys.jdbc.CacheDriver' engine"
+                        'Check if required jar file path is set')
+            return True
+
         config_db_schema = database_connection_config.get('schema')
         if not config_db_schema:
             _log.warning(f"No schema name defined in '{config_file_name}'. "
@@ -271,19 +289,19 @@ class Main:
             _log.info(f"Skipping table defined in '{config_file_name}' due to replicate=false")
             return True
 
-        table_name = table_config.get('table_name')
-        if not table_name:
-            _log.error(f"Table name '{table_name}' not defined or invalid in '{config_file_name}'. "
+        table = table_config.get('table')
+        if not table:
+            _log.error(f"Table name '{table}' not defined or invalid in '{config_file_name}'. "
                         "Skipping table...")
             return True
 
         file_format = table_config.get('file_format', 'csv').lower()
         if file_format not in VALID_FILE_FORMATS:
-            _log.error(f"Invalid file format defined in '{config_file_name}' for table '{table_name}'. "
+            _log.error(f"Invalid file format defined in '{config_file_name}' for table '{table}'. "
                     f"Expected one of {VALID_FILE_FORMATS}")
             return True
 
-        if table_name not in source_db_tables:
-            _log.error(f"Table '{table_name}' defined in '{config_file_name}' " 
+        if table not in source_db_tables:
+            _log.error(f"Table '{table}' defined in '{config_file_name}' " 
                         'does not exist in the source database. Skipping table...')
             return True
